@@ -64,6 +64,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -86,9 +89,6 @@ jobs:
       - name: Verify MariaDB is running
         run: mysql -h 127.0.0.1 -P 3800 -u root -proot -e "SELECT 1;"
 
-      - name: Get Docker host IP
-        run: echo "DOCKER_HOST=$(hostname -I | awk '{print $1}')" >> $GITHUB_ENV
-
       - name: Create database
         run: mysql -h 127.0.0.1 -P 3800 -u root -proot -e "CREATE DATABASE IF NOT EXISTS userservice;"
 
@@ -102,7 +102,7 @@ jobs:
         run: |
           docker run -d --name userservice-test \
             -e SERVER_PORT=8080 \
-            -e DB_HOST=$DOCKER_HOST \
+            -e DB_HOST=127.0.0.1 \
             -e DB_PORT=3800 \
             -e DB_USER=root \
             -e DB_PASSWORD=root \
