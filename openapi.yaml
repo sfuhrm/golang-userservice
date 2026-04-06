@@ -229,7 +229,7 @@ paths:
                 code: UNAUTHORIZED
                 message: Invalid or missing authentication token
 
-  /v1/users/me/password:
+  /v1/users/{id}/password:
     put:
       summary: Change password
       description: |
@@ -242,6 +242,14 @@ paths:
         - Account
       security:
         - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User UUID (must match authenticated user ID)
+          schema:
+            $ref: '#/components/schemas/UUID'
+          example: 550e8400-e29b-41d4-a716-446655440000
       requestBody:
         required: true
         content:
@@ -327,7 +335,15 @@ paths:
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
-  /v1/users/me:
+  /v1/users/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: User UUID (must match authenticated user ID)
+        schema:
+          $ref: '#/components/schemas/UUID'
+        example: 550e8400-e29b-41d4-a716-446655440000
     get:
       summary: Get current user profile
       description: |
@@ -863,7 +879,7 @@ components:
         href:
           type: string
           description: URL of the linked resource
-          example: /v1/users/me
+          example: /v1/users/550e8400-e29b-41d4-a716-446655440000
         method:
           type: string
           enum: [GET, POST, PUT, DELETE, PATCH]
@@ -1018,7 +1034,7 @@ components:
         updatedAt: "2024-01-20T14:45:00Z"
         links:
           - rel: self
-            href: /v1/users/me
+            href: /v1/users/550e8400-e29b-41d4-a716-446655440000
             method: GET
 
     UpdateProfileRequest:

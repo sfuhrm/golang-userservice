@@ -94,10 +94,10 @@ These are compiled-in defaults and cannot be changed via environment variables:
 | Method | Endpoint | Auth | Rate Limited | Description |
 |--------|----------|------|-------------|-------------|
 | POST | `/v1/users` | No | Yes (standard) | Register new user |
-| GET | `/v1/users/me` | Yes | Yes (standard) | Get current user profile |
-| PUT | `/v1/users/me` | Yes | Yes (standard) | Update user profile (misc data) |
-| PUT | `/v1/users/me/password` | Yes | Yes (standard) | Change password |
-| DELETE | `/v1/users/me` | Yes | Yes (standard) | Delete account |
+| GET | `/v1/users/:id` | Yes | Yes (standard) | Get current user profile |
+| PUT | `/v1/users/:id` | Yes | Yes (standard) | Update user profile (misc data) |
+| PUT | `/v1/users/:id/password` | Yes | Yes (standard) | Change password |
+| DELETE | `/v1/users/:id` | Yes | Yes (standard) | Delete account |
 
 ### Admin (Requires admin role)
 
@@ -136,7 +136,7 @@ curl -X POST http://localhost:8080/v1/auth/login \
 ### Get Profile
 
 ```bash
-curl -X GET http://localhost:8080/v1/users/me \
+curl -X GET http://localhost:8080/v1/users/<user_id> \
   -H "Authorization: Bearer <access_token>"
 ```
 
@@ -158,7 +158,7 @@ Response includes a `misc` field containing custom key-value data:
 ### Update Profile
 
 ```bash
-curl -X PUT http://localhost:8080/v1/users/me \
+curl -X PUT http://localhost:8080/v1/users/<user_id> \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -174,7 +174,7 @@ The `misc` field is merged with existing data, not replaced. New keys are added,
 ### Change Password
 
 ```bash
-curl -X PUT http://localhost:8080/v1/users/me/password \
+curl -X PUT http://localhost:8080/v1/users/<user_id>/password \
   -H "Authorization: Bearer <access_token>" \
   -H "Content-Type: application/json" \
   -d '{

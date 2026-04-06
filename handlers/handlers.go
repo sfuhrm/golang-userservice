@@ -5,6 +5,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -339,7 +340,7 @@ func (h *Handler) GetProfile(c echo.Context) error {
 		CreatedAt:     user.CreatedAt,
 		UpdatedAt:     user.UpdatedAt,
 		Links: []models.Link{
-			{Rel: "self", Href: "/v1/users/me", Method: "GET"},
+			{Rel: "self", Href: fmt.Sprintf("/v1/users/%s", user.ID), Method: "GET"},
 		},
 	})
 }
@@ -454,7 +455,7 @@ func (h *Handler) UpdateProfile(c echo.Context) error {
 		CreatedAt:     currentUser.CreatedAt,
 		UpdatedAt:     time.Now(),
 		Links: []models.Link{
-			{Rel: "self", Href: "/v1/users/me", Method: "GET"},
+			{Rel: "self", Href: fmt.Sprintf("/v1/users/%s", currentUser.ID), Method: "GET"},
 		},
 	})
 }

@@ -512,6 +512,9 @@ func TestGetProfile_Success(t *testing.T) {
 	if resp.Email != "test@example.com" {
 		t.Errorf("GetProfile() email = %s, want test@example.com", resp.Email)
 	}
+	if len(resp.Links) == 0 || resp.Links[0].Href != "/v1/users/user-123" {
+		t.Errorf("GetProfile() self link = %v, want /v1/users/user-123", resp.Links)
+	}
 }
 
 func TestGetProfile_WithMisc(t *testing.T) {
@@ -620,6 +623,9 @@ func TestUpdateProfile_Success(t *testing.T) {
 	}
 	if misc["language"] != "en" {
 		t.Errorf("UpdateProfile() misc language = %v, want en", misc["language"])
+	}
+	if len(resp.Links) == 0 || resp.Links[0].Href != "/v1/users/user-123" {
+		t.Errorf("UpdateProfile() self link = %v, want /v1/users/user-123", resp.Links)
 	}
 }
 
