@@ -19,6 +19,7 @@ A RESTful API service for user registration, authentication, and account managem
 - Rate limiting on authentication endpoints
 - CORS support for web applications
 - Database migrations with goose
+- Small memory footprint of around 10 MB
 
 ## Prerequisites
 
