@@ -71,7 +71,7 @@ def test_e2e():
     print("Testing update profile...")
     new_display = f"{username}_updated"
     r = requests.put(f"{BASE_URL}/users/{user_id}", headers=headers, json={
-        "display_name": new_display
+        "misc": {"display_name": new_display}
     })
     if r.status_code != 200:
         print(f"FAILED: Update profile returned {r.status_code}: {r.text}")
@@ -83,7 +83,8 @@ def test_e2e():
     if r.status_code != 200:
         print(f"FAILED: Get profile returned {r.status_code}: {r.text}")
         sys.exit(1)
-    if r.json()["display_name"] != new_display:
+    user_data = r.json()
+    if user_data.get("misc", {}).get("display_name") != new_display:
         print(f"FAILED: Display name not updated")
         sys.exit(1)
     print("Verified profile update")
