@@ -87,7 +87,7 @@ jobs:
       - name: Generate coverage badge
         run: python tests/generate_coverage_badge.py
 
-      - name: Upload coverage badge
+      - name: Upload coverage badge artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage-badge
@@ -97,3 +97,69 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker compose down
+
+  publish-coverage-badge:
+    needs: test-e2e
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage badge artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-badge
+          path: /tmp/coverage-badge
+
+      - name: Publish badge to gh-pages
+        run: |
+          set -euo pipefail
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          if git ls-remote --exit-code --heads origin gh-pages; then
+            git checkout gh-pages
+            git pull --ff-only origin gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cp /tmp/coverage-badge/coverage_badge.svg coverage_badge.svg
+
+          cat > index.html << 'HTML'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>API Coverage</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; }
+              .badge { display: inline-block; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <h1>API Coverage Badge</h1>
+            <p>Coverage from e2e tests:</p>
+            <div class="badge">
+              <img src="coverage_badge.svg" alt="Coverage" />
+            </div>
+          </body>
+          </html>
+          HTML
+
+          git add coverage_badge.svg index.html
+
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+            exit 0
+          fi
+
+          git commit -m "Update coverage badge"
+          git push origin gh-pages

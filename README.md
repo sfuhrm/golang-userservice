@@ -1,5 +1,7 @@
 # User Service API
 
+[![Coverage](https://sfuhrm.github.io/golang-userservice/coverage_badge.svg)](https://sfuhrm.github.io/golang-userservice/)
+
 A RESTful API service for user registration, authentication, and account management built with Go and Echo framework.
 
 ## Features
