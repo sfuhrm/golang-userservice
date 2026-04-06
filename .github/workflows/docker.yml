@@ -1,0 +1,119 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  test-e2e:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Start MariaDB
+        uses: supercharge/mariadb-action@v1
+        with:
+          mariadb-version: '10.11'
+
+      - name: Create database
+        run: mysql -u root -proot -e "CREATE DATABASE IF NOT EXISTS userservice;"
+
+      - name: Create jwt secret
+        run: echo "test-jwt-secret-key-for-ci" > secrets/jwt_secret
+
+      - name: Build app
+        run: docker build -t userservice:test .
+
+      - name: Run app
+        run: |
+          docker run -d --name userservice-test \
+            -e SERVER_PORT=8080 \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=3306 \
+            -e DB_USER=root \
+            -e DB_PASSWORD=root \
+            -e DB_NAME=userservice \
+            -e JWT_SECRET_FILE=/app/secrets/jwt_secret \
+            -v $(pwd)/secrets:/app/secrets:ro \
+            -p 8080:8080 \
+            userservice:test
+
+      - name: Wait for app
+        run: sleep 5
+
+      - name: Run e2e tests
+        env:
+          BASE_URL: http://localhost:8080/v1
+        run: python tests/e2e.py
+
+      - name: Cleanup
+        if: always()
+        run: docker stop userservice-test || true
+
+  deploy:
+    needs: test-e2e
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+            docker stop userservice || true
+            docker rm userservice || true
+            docker run -d --name userservice -p 8080:8080 ghcr.io/${{ github.repository }}:${{ github.sha }}
