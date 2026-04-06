@@ -6,6 +6,10 @@
 
 A RESTful API service for user registration, authentication, and account management built with Go and Echo framework.
 
+## Status
+
+:warning: Experimental status! Largely untested! Password recovery via email not implemented. Features / API may change. Use with caution.
+
 ## Features
 
 - User registration with email verification flow
