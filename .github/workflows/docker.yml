@@ -76,9 +76,21 @@ jobs:
         uses: getong/mariadb-action@v1
         with:
           mariadb-version: '10.11'
+          mysql-root-password: 'root'
+          mariadb-database: 'userservice'
+          host-port: 3800
+
+      - name: Wait for MariaDB
+        run: sleep 15
+
+      - name: Verify MariaDB is running
+        run: mysql -h 127.0.0.1 -P 3800 -u root -proot -e "SELECT 1;"
+
+      - name: Get Docker host IP
+        run: echo "DOCKER_HOST=$(hostname -I | awk '{print $1}')" >> $GITHUB_ENV
 
       - name: Create database
-        run: mysql -u root -proot -e "CREATE DATABASE IF NOT EXISTS userservice;"
+        run: mysql -h 127.0.0.1 -P 3800 -u root -proot -e "CREATE DATABASE IF NOT EXISTS userservice;"
 
       - name: Create jwt secret
         run: echo "test-jwt-secret-key-for-ci" > secrets/jwt_secret
@@ -90,8 +102,8 @@ jobs:
         run: |
           docker run -d --name userservice-test \
             -e SERVER_PORT=8080 \
-            -e DB_HOST=127.0.0.1 \
-            -e DB_PORT=3306 \
+            -e DB_HOST=$DOCKER_HOST \
+            -e DB_PORT=3800 \
             -e DB_USER=root \
             -e DB_PASSWORD=root \
             -e DB_NAME=userservice \
