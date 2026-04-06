@@ -59,6 +59,26 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run unit tests with coverage
+        run: |
+          set -euo pipefail
+
+          go test -coverprofile=unit_coverage.out ./...
+
+          UNIT_COVERAGE=$(go tool cover -func=unit_coverage.out | awk '/^total:/ { gsub("%", "", $NF); print $NF }')
+          if [ -z "$UNIT_COVERAGE" ]; then
+            echo "ERROR: failed to extract unit coverage"
+            exit 1
+          fi
+
+          echo "UNIT_COVERAGE=$UNIT_COVERAGE" >> "$GITHUB_ENV"
+          echo "Unit coverage: ${UNIT_COVERAGE}%"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -85,6 +105,8 @@ jobs:
         run: python tests/e2e.py
 
       - name: Generate coverage badge
+        env:
+          UNIT_COVERAGE: ${{ env.UNIT_COVERAGE }}
         run: python tests/generate_coverage_badge.py
 
       - name: Upload coverage badge artifact
@@ -146,7 +168,7 @@ jobs:
           </head>
           <body>
             <h1>API Coverage Badge</h1>
-            <p>Coverage from e2e tests:</p>
+            <p>Coverage from e2e and unit tests:</p>
             <div class="badge">
               <img src="coverage_badge.svg" alt="Coverage" />
             </div>

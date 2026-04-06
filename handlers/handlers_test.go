@@ -231,6 +231,12 @@ func TestLogin_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT id, username, email, password_hash").WithArgs("test@example.com").WillReturnRows(rows)
 	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
 	mock.ExpectExec("INSERT INTO refresh_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("SELECT id, username, email, email_verified, created_at, updated_at FROM users WHERE id = ?").
+		WithArgs("user-123").
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
+				AddRow("user-123", "testuser", "test@example.com", true, time.Now(), time.Now()),
+		)
 
 	if err := h.Login(c); err != nil {
 		t.Errorf("Login() error = %v", err)
@@ -370,6 +376,12 @@ func TestRefresh_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
 	mock.ExpectExec("DELETE FROM refresh_tokens").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO refresh_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("SELECT id, username, email, email_verified, created_at, updated_at FROM users WHERE id = ?").
+		WithArgs("user-123").
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
+				AddRow("user-123", "testuser", "test@example.com", true, time.Now(), time.Now()),
+		)
 
 	if err := h.Refresh(c); err != nil {
 		t.Errorf("Refresh() error = %v", err)
