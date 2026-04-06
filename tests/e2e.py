@@ -42,7 +42,7 @@ def test_e2e():
 
     print("Testing login...")
     r = requests.post(f"{BASE_URL}/auth/login", json={
-        "username": username,
+        "email": email,
         "password": password
     })
     if r.status_code != 200:
@@ -93,7 +93,7 @@ def test_e2e():
 
     print("Testing login after deletion...")
     r = requests.post(f"{BASE_URL}/auth/login", json={
-        "username": username,
+        "email": email,
         "password": password
     })
     if r.status_code != 401:
