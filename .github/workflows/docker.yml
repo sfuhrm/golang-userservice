@@ -75,45 +75,17 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Start MariaDB
-        uses: getong/mariadb-action@v1
-        with:
-          mysql version: '10.11'
-          mysql root password: 'root'
-          mysql database: 'userservice'
-          host port: 3800
-
-      - name: Wait for MariaDB
-        run: sleep 15
-
-      - name: Verify MariaDB is running
-        run: mysql -h 127.0.0.1 -P 3800 -u root -proot -e "SELECT 1;"
-
-      - name: Create database
-        run: mysql -h 127.0.0.1 -P 3800 -u root -proot -e "CREATE DATABASE IF NOT EXISTS userservice;"
-
       - name: Create jwt secret
         run: echo "test-jwt-secret-key-for-ci" > secrets/jwt_secret
 
       - name: Build app
-        run: docker build -t userservice:test .
+        run: docker compose build app
 
-      - name: Run app
-        run: |
-          docker run -d --name userservice-test \
-            -e SERVER_PORT=8080 \
-            -e DB_HOST=127.0.0.1 \
-            -e DB_PORT=3800 \
-            -e DB_USER=root \
-            -e DB_PASSWORD=root \
-            -e DB_NAME=userservice \
-            -e JWT_SECRET_FILE=/app/secrets/jwt_secret \
-            -v $(pwd)/secrets:/app/secrets:ro \
-            -p 8080:8080 \
-            userservice:test
+      - name: Start services
+        run: docker compose up -d
 
       - name: Wait for app
-        run: sleep 5
+        run: sleep 10
 
       - name: Run e2e tests
         env:
@@ -132,7 +104,7 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker stop userservice-test || true
+        run: docker compose down
 
   deploy:
     needs: test-e2e
