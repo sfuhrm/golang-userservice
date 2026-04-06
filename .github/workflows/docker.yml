@@ -73,7 +73,7 @@ jobs:
         run: pip install requests
 
       - name: Start MariaDB
-        uses: supercharge/mariadb-action@v1
+        uses: getong/mariadb-action@v1
         with:
           mariadb-version: '10.11'
 
