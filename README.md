@@ -1,5 +1,6 @@
 # User Service API
 
+[![Build and Deploy](https://github.com/sfuhrm/golang-userservice/actions/workflows/docker.yml/badge.svg)](https://github.com/sfuhrm/golang-userservice/actions/workflows/docker.yml)
 [![Coverage](https://raw.githubusercontent.com/sfuhrm/golang-userservice/refs/heads/gh-pages/coverage_badge.svg)](https://sfuhrm.github.io/golang-userservice/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) 
 
