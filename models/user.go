@@ -80,6 +80,7 @@ type AuthResponse struct {
 	TokenType             string    `json:"tokenType"`             // Token type (e.g., "Bearer")
 	AccessTokenExpiresAt  time.Time `json:"accessTokenExpiresAt"`  // Access token expiration timestamp
 	RefreshTokenExpiresAt time.Time `json:"refreshTokenExpiresAt"` // Refresh token expiration timestamp
+	User                  *User     `json:"user,omitempty"`        // User profile
 	Links                 []Link    `json:"links"`                 // Hypermedia links
 }
 
@@ -143,6 +144,7 @@ type Link struct {
 
 // RegisterResponse represents the response body after successful user registration.
 type RegisterResponse struct {
+	UserID  string `json:"userId"`  // ID of the newly created user
 	Message string `json:"message"` // Success message
 	Links   []Link `json:"links"`   // Hypermedia links
 }

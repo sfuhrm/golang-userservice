@@ -124,6 +124,7 @@ func (h *Handler) Register(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusCreated, models.RegisterResponse{
+		UserID:  userID,
 		Message: "User created successfully",
 		Links: []models.Link{
 			{Rel: "login", Href: "/v1/auth/login", Method: "POST"},
@@ -616,12 +617,25 @@ func (h *Handler) generateTokens(c echo.Context, userID string, roles []models.U
 		})
 	}
 
+	var user models.User
+	err = h.db.QueryRow(
+		"SELECT id, username, email, email_verified, created_at, updated_at FROM users WHERE id = ?",
+		userID,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.EmailVerified, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to retrieve user",
+		})
+	}
+
 	return c.JSON(http.StatusOK, models.AuthResponse{
 		AccessToken:           accessToken,
 		RefreshToken:          refreshToken,
 		TokenType:             "Bearer",
 		AccessTokenExpiresAt:  time.Now().Add(h.cfg.JWTExpire),
 		RefreshTokenExpiresAt: expiresAt,
+		User:                  &user,
 		Links: []models.Link{
 			{Rel: "self", Href: "/v1/auth/login", Method: "POST"},
 			{Rel: "refresh", Href: "/v1/auth/refresh", Method: "POST"},
