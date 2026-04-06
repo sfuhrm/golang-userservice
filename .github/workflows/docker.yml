@@ -105,20 +105,3 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker compose down
-
-  deploy:
-    needs: test-e2e
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USERNAME }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
-            docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
-            docker stop userservice || true
-            docker rm userservice || true
-            docker run -d --name userservice -p 8080:8080 ghcr.io/${{ github.repository }}:${{ github.sha }}
