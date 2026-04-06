@@ -10,10 +10,14 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8080/v1")
 def wait_for_service(url, max_retries=30, delay=2):
     for i in range(max_retries):
         try:
-            r = requests.post(f"{url}/auth/login", json={}, timeout=5)
-            if r.status_code != 500:  # 401/400 is fine, means service is up
+            result = subprocess.run(
+                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST", f"{url}/auth/login", "-H", "Content-Type: application/json", "-d", "{}"],
+                capture_output=True, text=True, timeout=5
+            )
+            code = result.stdout.strip()
+            if code and code != "000":
                 return True
-        except requests.exceptions.RequestException:
+        except subprocess.TimeoutExpired:
             pass
         time.sleep(delay)
     return False
@@ -48,7 +52,7 @@ def test_e2e():
     if r.status_code != 200:
         print(f"FAILED: Login returned {r.status_code}: {r.text}")
         sys.exit(1)
-    token = r.json()["access_token"]
+    token = r.json()["accessToken"]
     user_id = r.json()["user"]["id"]
     headers = {"Authorization": f"Bearer {token}"}
     print("Logged in successfully")
