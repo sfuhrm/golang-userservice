@@ -40,7 +40,7 @@ def test_e2e():
     print(f"Registered user: {username}")
 
     print("Testing login...")
-    r = requests.post(f"{BASE_URL}/users/login", json={
+    r = requests.post(f"{BASE_URL}/auth/login", json={
         "username": username,
         "password": password
     })
@@ -90,7 +90,7 @@ def test_e2e():
     print("Account deleted")
 
     print("Testing login after deletion...")
-    r = requests.post(f"{BASE_URL}/users/login", json={
+    r = requests.post(f"{BASE_URL}/auth/login", json={
         "username": username,
         "password": password
     })
