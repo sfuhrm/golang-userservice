@@ -17,6 +17,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: coverage-badge
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Generate badge HTML
         run: |
@@ -65,8 +66,7 @@ jobs:
           
           git checkout gh-pages
           
-          cp ../coverage-badge/coverage_badge.svg . 2>/dev/null || true
-          cp index.html index.html
+          cp coverage_badge.svg . 2>/dev/null || true
           
           if [ -f coverage_badge.svg ]; then
             git add coverage_badge.svg index.html
