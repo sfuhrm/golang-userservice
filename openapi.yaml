@@ -51,6 +51,16 @@ paths:
                   message:
                     type: string
                     example: User created successfully
+                  links:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Link'
+              example:
+                message: User created successfully
+                links:
+                  - rel: login
+                    href: /v1/auth/login
+                    method: POST
         '400':
           $ref: '#/components/responses/BadRequest'
           content:
@@ -524,6 +534,11 @@ paths:
                 totalCount: 2
                 page: 1
                 pageSize: 20
+                links:
+                  - rel: self
+                    href: /v1/admin/users?page=1&pageSize=20
+                  - rel: next
+                    href: /v1/admin/users?page=2&pageSize=20
         '401':
           description: Unauthorized
           content:
@@ -578,6 +593,16 @@ paths:
                   theme: dark
                 createdAt: "2024-01-15T10:30:00Z"
                 updatedAt: "2024-01-20T14:45:00Z"
+                links:
+                  - rel: self
+                    href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+                    method: GET
+                  - rel: update
+                    href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+                    method: PUT
+                  - rel: delete
+                    href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+                    method: DELETE
         '401':
           description: Unauthorized
           content:
@@ -680,6 +705,16 @@ paths:
                 misc: {}
                 createdAt: "2024-01-15T10:30:00Z"
                 updatedAt: "2024-01-20T16:00:00Z"
+                links:
+                  - rel: self
+                    href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+                    method: GET
+                  - rel: update
+                    href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+                    method: PUT
+                  - rel: delete
+                    href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+                    method: DELETE
         '400':
           $ref: '#/components/responses/BadRequest'
           content:
@@ -818,6 +853,23 @@ components:
         - `admin`: Administrator with elevated privileges
       example: user
 
+    Link:
+      type: object
+      properties:
+        rel:
+          type: string
+          description: Relation type (e.g., self, next, previous, profile)
+          example: self
+        href:
+          type: string
+          description: URL of the linked resource
+          example: /v1/users/me
+        method:
+          type: string
+          enum: [GET, POST, PUT, DELETE, PATCH]
+          description: HTTP method for the link
+          example: GET
+
     DateTime:
       type: string
       format: date-time
@@ -881,12 +933,27 @@ components:
           format: date-time
           description: Absolute timestamp when the refresh token expires (ISO 8601 UTC)
           example: "2024-01-22T10:30:00Z"
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Hypermedia links to related resources
       example:
         accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         refreshToken: dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4...
         tokenType: Bearer
         accessTokenExpiresAt: "2024-01-15T10:45:00Z"
         refreshTokenExpiresAt: "2024-01-22T10:30:00Z"
+        links:
+          - rel: self
+            href: /v1/auth/login
+            method: POST
+          - rel: refresh
+            href: /v1/auth/refresh
+            method: POST
+          - rel: logout
+            href: /v1/auth/logout
+            method: POST
 
     ErrorResponse:
       type: object
@@ -933,6 +1000,11 @@ components:
           $ref: '#/components/schemas/DateTime'
         updatedAt:
           $ref: '#/components/schemas/DateTime'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Hypermedia links to related resources
       example:
         id: 550e8400-e29b-41d4-a716-446655440000
         username: john_doe
@@ -944,6 +1016,10 @@ components:
           theme: dark
         createdAt: "2024-01-15T10:30:00Z"
         updatedAt: "2024-01-20T14:45:00Z"
+        links:
+          - rel: self
+            href: /v1/users/me
+            method: GET
 
     UpdateProfileRequest:
       type: object
@@ -993,6 +1069,11 @@ components:
           $ref: '#/components/schemas/DateTime'
         updatedAt:
           $ref: '#/components/schemas/DateTime'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Hypermedia links to related resources
       example:
         id: 550e8400-e29b-41d4-a716-446655440000
         username: john_doe
@@ -1006,6 +1087,16 @@ components:
           department: engineering
         createdAt: "2024-01-15T10:30:00Z"
         updatedAt: "2024-01-20T14:45:00Z"
+        links:
+          - rel: self
+            href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+            method: GET
+          - rel: update
+            href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+            method: PUT
+          - rel: delete
+            href: /v1/admin/users/550e8400-e29b-41d4-a716-446655440000
+            method: DELETE
 
     AdminUpdateUserRequest:
       type: object
@@ -1057,6 +1148,11 @@ components:
           type: integer
           description: Number of users per page
           example: 20
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+          description: Hypermedia links to related resources
       example:
         users:
           - id: 550e8400-e29b-41d4-a716-446655440000
@@ -1071,6 +1167,11 @@ components:
         totalCount: 1
         page: 1
         pageSize: 20
+        links:
+          - rel: self
+            href: /v1/admin/users?page=1&pageSize=20
+          - rel: next
+            href: /v1/admin/users?page=2&pageSize=20
 
   responses:
     BadRequest:

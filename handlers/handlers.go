@@ -123,7 +123,12 @@ func (h *Handler) Register(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusCreated, nil)
+	return c.JSON(http.StatusCreated, models.RegisterResponse{
+		Message: "User created successfully",
+		Links: []models.Link{
+			{Rel: "login", Href: "/v1/auth/login", Method: "POST"},
+		},
+	})
 }
 
 // Login handles user authentication requests.
@@ -275,7 +280,15 @@ func (h *Handler) Logout(c echo.Context) error {
 // Requires valid JWT access token.
 // Returns 200 OK with UserProfile, 404 if user not found.
 func (h *Handler) GetProfile(c echo.Context) error {
-	userID := c.Get("userID").(string)
+	userID := c.Param("id")
+	authUserID := c.Get("userID").(string)
+
+	if userID != authUserID {
+		return c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Code:    "FORBIDDEN",
+			Message: "Cannot access other user's profile",
+		})
+	}
 
 	var user models.User
 	err := h.db.QueryRow(
@@ -324,6 +337,9 @@ func (h *Handler) GetProfile(c echo.Context) error {
 		Misc:          miscData,
 		CreatedAt:     user.CreatedAt,
 		UpdatedAt:     user.UpdatedAt,
+		Links: []models.Link{
+			{Rel: "self", Href: "/v1/users/me", Method: "GET"},
+		},
 	})
 }
 
@@ -331,7 +347,15 @@ func (h *Handler) GetProfile(c echo.Context) error {
 // Merges provided misc with existing misc data.
 // Returns 200 OK with updated UserProfile, 404 if user not found.
 func (h *Handler) UpdateProfile(c echo.Context) error {
-	userID := c.Get("userID").(string)
+	userID := c.Param("id")
+	authUserID := c.Get("userID").(string)
+
+	if userID != authUserID {
+		return c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Code:    "FORBIDDEN",
+			Message: "Cannot update other user's profile",
+		})
+	}
 
 	var req models.UpdateProfileRequest
 	if err := c.Bind(&req); err != nil {
@@ -428,6 +452,9 @@ func (h *Handler) UpdateProfile(c echo.Context) error {
 		Misc:          mergedMisc,
 		CreatedAt:     currentUser.CreatedAt,
 		UpdatedAt:     time.Now(),
+		Links: []models.Link{
+			{Rel: "self", Href: "/v1/users/me", Method: "GET"},
+		},
 	})
 }
 
@@ -435,7 +462,15 @@ func (h *Handler) UpdateProfile(c echo.Context) error {
 // Removes the user and associated refresh tokens from the database.
 // Returns 202 Accepted on success.
 func (h *Handler) DeleteAccount(c echo.Context) error {
-	userID := c.Get("userID").(string)
+	userID := c.Param("id")
+	authUserID := c.Get("userID").(string)
+
+	if userID != authUserID {
+		return c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Code:    "FORBIDDEN",
+			Message: "Cannot delete other user's account",
+		})
+	}
 
 	result, err := h.db.Exec("DELETE FROM users WHERE id = ?", userID)
 	if err != nil {
@@ -461,7 +496,15 @@ func (h *Handler) DeleteAccount(c echo.Context) error {
 // Invalidates all existing refresh tokens for security.
 // Returns 204 No Content on success.
 func (h *Handler) ChangePassword(c echo.Context) error {
-	userID := c.Get("userID").(string)
+	userID := c.Param("id")
+	authUserID := c.Get("userID").(string)
+
+	if userID != authUserID {
+		return c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Code:    "FORBIDDEN",
+			Message: "Cannot change other user's password",
+		})
+	}
 
 	var req models.ChangePasswordRequest
 	if err := c.Bind(&req); err != nil {
@@ -579,6 +622,11 @@ func (h *Handler) generateTokens(c echo.Context, userID string, roles []models.U
 		TokenType:             "Bearer",
 		AccessTokenExpiresAt:  time.Now().Add(h.cfg.JWTExpire),
 		RefreshTokenExpiresAt: expiresAt,
+		Links: []models.Link{
+			{Rel: "self", Href: "/v1/auth/login", Method: "POST"},
+			{Rel: "refresh", Href: "/v1/auth/refresh", Method: "POST"},
+			{Rel: "logout", Href: "/v1/auth/logout", Method: "POST"},
+		},
 	})
 }
 
@@ -666,11 +714,22 @@ func (h *Handler) ListUsers(c echo.Context) error {
 		users = append(users, user)
 	}
 
+	links := []models.Link{
+		{Rel: "self", Href: "/v1/admin/users?page=" + strconv.Itoa(page) + "&pageSize=" + strconv.Itoa(pageSize), Method: "GET"},
+	}
+	if totalCount > page*pageSize {
+		links = append(links, models.Link{Rel: "next", Href: "/v1/admin/users?page=" + strconv.Itoa(page+1) + "&pageSize=" + strconv.Itoa(pageSize), Method: "GET"})
+	}
+	if totalCount > page*pageSize {
+		links = append(links, models.Link{Rel: "next", Href: "/v1/admin/users?page=" + strconv.Itoa(page+1) + "&pageSize=" + strconv.Itoa(pageSize), Method: "GET"})
+	}
+
 	return c.JSON(http.StatusOK, models.UserListResponse{
 		Users:      users,
 		TotalCount: totalCount,
 		Page:       page,
 		PageSize:   pageSize,
+		Links:      links,
 	})
 }
 
@@ -717,6 +776,11 @@ func (h *Handler) GetUser(c echo.Context) error {
 		})
 	}
 	user.Misc = miscData
+	user.Links = []models.Link{
+		{Rel: "self", Href: "/v1/admin/users/" + userID, Method: "GET"},
+		{Rel: "update", Href: "/v1/admin/users/" + userID, Method: "PUT"},
+		{Rel: "delete", Href: "/v1/admin/users/" + userID, Method: "DELETE"},
+	}
 
 	return c.JSON(http.StatusOK, user)
 }

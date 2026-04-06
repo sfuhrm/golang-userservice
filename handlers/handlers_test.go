@@ -478,10 +478,12 @@ func TestGetProfile_Success(t *testing.T) {
 	h, mock, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	now := time.Now()
 	userRows := sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
@@ -516,10 +518,12 @@ func TestGetProfile_WithMisc(t *testing.T) {
 	h, mock, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	now := time.Now()
 	userRows := sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
@@ -552,10 +556,12 @@ func TestGetProfile_UserNotFound(t *testing.T) {
 	h, mock, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userID", "nonexistent-user")
+	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectQuery("SELECT id, username, email, email_verified").WillReturnError(sql.ErrNoRows)
 
@@ -579,11 +585,13 @@ func TestUpdateProfile_Success(t *testing.T) {
 
 	reqBody := `{"misc":{"theme":"dark","language":"en"}}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	now := time.Now()
 	userRows := sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
@@ -621,11 +629,13 @@ func TestUpdateProfile_MergeWithExisting(t *testing.T) {
 
 	reqBody := `{"misc":{"theme":"light"}}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	now := time.Now()
 	userRows := sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
@@ -667,11 +677,13 @@ func TestUpdateProfile_UserNotFound(t *testing.T) {
 
 	reqBody := `{"misc":{"theme":"dark"}}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userID", "nonexistent-user")
+	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectQuery("SELECT id, username, email, email_verified").WillReturnError(sql.ErrNoRows)
 
@@ -693,11 +705,13 @@ func TestUpdateProfile_InvalidJSON(t *testing.T) {
 	h, _, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me", strings.NewReader("invalid"))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123", strings.NewReader("invalid"))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	h.UpdateProfile(c)
 
@@ -710,10 +724,12 @@ func TestDeleteAccount_Success(t *testing.T) {
 	h, mock, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/users/user-123", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectExec("DELETE FROM users").WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -730,10 +746,12 @@ func TestDeleteAccount_UserNotFound(t *testing.T) {
 	h, mock, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/v1/users/user-123", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userID", "nonexistent-user")
+	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectExec("DELETE FROM users").WillReturnResult(sqlmock.NewResult(0, 0))
 
@@ -752,11 +770,13 @@ func TestChangePassword_Success(t *testing.T) {
 	currentHash := string(hashedPwd)
 	reqBody := `{"currentPassword":"oldpassword","newPassword":"newpassword123"}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me/password", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123/password", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectQuery("SELECT password_hash").WithArgs("user-123").WillReturnRows(sqlmock.NewRows([]string{"password_hash"}).AddRow(currentHash))
 	mock.ExpectExec("UPDATE users").WillReturnResult(sqlmock.NewResult(0, 1))
@@ -775,11 +795,13 @@ func TestChangePassword_InvalidJSON(t *testing.T) {
 	h, _, e := newTestHandler(t)
 	defer h.db.Close()
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me/password", strings.NewReader("invalid"))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123/password", strings.NewReader("invalid"))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	h.ChangePassword(c)
 
@@ -794,11 +816,13 @@ func TestChangePassword_NewPasswordTooShort(t *testing.T) {
 
 	reqBody := `{"currentPassword":"oldpassword","newPassword":"short"}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me/password", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123/password", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	h.ChangePassword(c)
 
@@ -820,11 +844,13 @@ func TestChangePassword_NewPasswordTooLong(t *testing.T) {
 
 	reqBody := `{"currentPassword":"oldpassword","newPassword":"` + strings.Repeat("a", 129) + `"}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me/password", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123/password", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	h.ChangePassword(c)
 
@@ -839,11 +865,13 @@ func TestChangePassword_UserNotFound(t *testing.T) {
 
 	reqBody := `{"currentPassword":"oldpassword","newPassword":"newpassword123"}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me/password", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123/password", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.Set("userID", "nonexistent-user")
+	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectQuery("SELECT password_hash").WillReturnError(sql.ErrNoRows)
 
@@ -862,11 +890,13 @@ func TestChangePassword_IncorrectCurrentPassword(t *testing.T) {
 	currentHash := string(hashedPwd)
 	reqBody := `{"currentPassword":"wrongpassword","newPassword":"newpassword123"}`
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/users/me/password", strings.NewReader(reqBody))
+	req := httptest.NewRequest(http.MethodPut, "/v1/users/user-123/password", strings.NewReader(reqBody))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	c.Set("userID", "user-123")
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
 
 	mock.ExpectQuery("SELECT password_hash").WithArgs("user-123").WillReturnRows(sqlmock.NewRows([]string{"password_hash"}).AddRow(currentHash))
 
@@ -964,7 +994,7 @@ func TestJWTAuth_MissingHeader(t *testing.T) {
 	}
 
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
@@ -985,7 +1015,7 @@ func TestJWTAuth_InvalidFormat(t *testing.T) {
 	}
 
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	req.Header.Set("Authorization", "InvalidFormat token123")
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -1007,7 +1037,7 @@ func TestJWTAuth_InvalidToken(t *testing.T) {
 	}
 
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -1035,7 +1065,7 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 	}
 
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/v1/users/me", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/users/user-123", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)

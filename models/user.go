@@ -80,6 +80,7 @@ type AuthResponse struct {
 	TokenType             string    `json:"tokenType"`             // Token type (e.g., "Bearer")
 	AccessTokenExpiresAt  time.Time `json:"accessTokenExpiresAt"`  // Access token expiration timestamp
 	RefreshTokenExpiresAt time.Time `json:"refreshTokenExpiresAt"` // Refresh token expiration timestamp
+	Links                 []Link    `json:"links"`                 // Hypermedia links
 }
 
 // ErrorResponse represents an error response body.
@@ -100,6 +101,7 @@ type UserProfile struct {
 	Misc          json.RawMessage `json:"misc"`          // Custom key/value data (JSON)
 	CreatedAt     time.Time       `json:"createdAt"`     // Account creation time
 	UpdatedAt     time.Time       `json:"updatedAt"`     // Last update time
+	Links         []Link          `json:"links"`         // Hypermedia links
 }
 
 // UpdateProfileRequest represents the request body for updating user profile.
@@ -120,6 +122,7 @@ type AdminUser struct {
 	Misc          json.RawMessage `json:"misc"`          // Custom key/value data (JSON)
 	CreatedAt     time.Time       `json:"createdAt"`     // Account creation time
 	UpdatedAt     time.Time       `json:"updatedAt"`     // Last update time
+	Links         []Link          `json:"links"`         // Hypermedia links
 }
 
 // AdminUpdateUserRequest represents the request body for admin updating a user.
@@ -131,10 +134,24 @@ type AdminUpdateUserRequest struct {
 	Roles         []UserRole `json:"roles,omitempty"`         // User roles (replaces existing)
 }
 
+// Link represents a hypermedia link for HATEOAS.
+type Link struct {
+	Rel    string `json:"rel"`              // Relation type (e.g., self, next, previous)
+	Href   string `json:"href"`             // URL of the linked resource
+	Method string `json:"method,omitempty"` // HTTP method for the link
+}
+
+// RegisterResponse represents the response body after successful user registration.
+type RegisterResponse struct {
+	Message string `json:"message"` // Success message
+	Links   []Link `json:"links"`   // Hypermedia links
+}
+
 // UserListResponse represents a paginated list of users for admin.
 type UserListResponse struct {
 	Users      []AdminUser `json:"users"`      // List of users
 	TotalCount int         `json:"totalCount"` // Total number of users
 	Page       int         `json:"page"`       // Current page
 	PageSize   int         `json:"pageSize"`   // Page size
+	Links      []Link      `json:"links"`      // Hypermedia links
 }

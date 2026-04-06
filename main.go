@@ -61,10 +61,10 @@ func main() {
 	apiAuth.POST("/password-recovery", h.PasswordRecovery, authLimiter.Middleware())
 
 	api.POST("/users", h.Register)
-	api.PUT("/users/me/password", h.ChangePassword, middleware.JWTAuth(cfg))
-	api.GET("/users/me", h.GetProfile, middleware.JWTAuth(cfg))
-	api.PUT("/users/me", h.UpdateProfile, middleware.JWTAuth(cfg))
-	api.DELETE("/users/me", h.DeleteAccount, middleware.JWTAuth(cfg))
+	api.PUT("/users/:id/password", h.ChangePassword, middleware.JWTAuth(cfg))
+	api.GET("/users/:id", h.GetProfile, middleware.JWTAuth(cfg))
+	api.PUT("/users/:id", h.UpdateProfile, middleware.JWTAuth(cfg))
+	api.DELETE("/users/:id", h.DeleteAccount, middleware.JWTAuth(cfg))
 
 	apiAdmin := api.Group("/admin")
 	apiAdmin.Use(middleware.JWTAuth(cfg))
