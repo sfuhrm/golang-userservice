@@ -75,10 +75,10 @@ jobs:
       - name: Start MariaDB
         uses: getong/mariadb-action@v1
         with:
-          mariadb-version: '10.11'
-          mysql-root-password: 'root'
-          mariadb-database: 'userservice'
-          host-port: 3800
+          mysql version: '10.11'
+          mysql root password: 'root'
+          mysql database: 'userservice'
+          host port: 3800
 
       - name: Wait for MariaDB
         run: sleep 15
@@ -119,6 +119,16 @@ jobs:
         env:
           BASE_URL: http://localhost:8080/v1
         run: python tests/e2e.py
+
+      - name: Generate coverage badge
+        run: python tests/generate_coverage_badge.py
+
+      - name: Upload coverage badge
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badge
+          path: coverage_badge.svg
+          retention-days: 7
 
       - name: Cleanup
         if: always()

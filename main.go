@@ -4,6 +4,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
@@ -49,6 +50,20 @@ func main() {
 	authLimiter := middleware.NewRateLimiter(cfg.AuthRateLimit, cfg.RateLimitWindow)
 
 	e.Use(standardLimiter.Middleware())
+
+	coverageTracker := middleware.NewCoverageTracker()
+	e.Use(coverageTracker.Middleware())
+
+	e.GET("/debug/coverage", func(c echo.Context) error {
+		coverage := middleware.CalculateCoverage()
+		coveredRoutes := middleware.GetCoveredRoutes()
+		allRoutes := middleware.GetAllRoutes()
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"coverage":       coverage,
+			"covered_routes": coveredRoutes,
+			"total_routes":   allRoutes,
+		})
+	})
 
 	h := handlers.New(db, cfg)
 

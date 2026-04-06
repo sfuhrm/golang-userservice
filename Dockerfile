@@ -7,7 +7,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /userservice .
+RUN CGO_ENABLED=0 GOOS=linux go build -cover -o /userservice .
 
 FROM alpine:3.19
 
