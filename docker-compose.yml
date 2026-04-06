@@ -1,0 +1,39 @@
+---
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_USER=userservice
+      - DB_PASSWORD=userservice
+      - DB_NAME=userservice
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+    volumes:
+      - ./secrets:/run/secrets:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      - MARIADB_ROOT_PASSWORD=root
+      - MARIADB_DATABASE=userservice
+      - MARIADB_USER=userservice
+      - MARIADB_PASSWORD=userservice
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  mariadb_data:
