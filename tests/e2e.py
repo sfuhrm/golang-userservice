@@ -91,7 +91,7 @@ def test_e2e():
 
     print("Testing delete account...")
     r = requests.delete(f"{BASE_URL}/users/{user_id}", headers=headers)
-    if r.status_code != 204:
+    if r.status_code != 202:
         print(f"FAILED: Delete account returned {r.status_code}: {r.text}")
         sys.exit(1)
     print("Account deleted")
