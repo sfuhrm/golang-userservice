@@ -38,6 +38,7 @@ docker-compose logs -f app
 ```
 
 The API will be available at `http://localhost:8080`
+Swagger UI will be available at `http://localhost:8081`
 
 ### Local Development
 
