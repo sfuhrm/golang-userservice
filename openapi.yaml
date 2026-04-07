@@ -6,14 +6,16 @@ info:
     API for user registration, authentication, and account management.
     
     ### Global Policies
-    * **CORS**: Allowed for `https://*.example.com`. Preflight requests (OPTIONS) are supported.
+    * **CORS**: Allowed for `https://*.example.com`, `http://localhost:8081`, and `http://127.0.0.1:8081`. Preflight requests (OPTIONS) are supported.
     * **Rate Limiting**: 
       * Standard: 100 requests / 15 min per IP.
       * Auth Endpoints (`/login`, `/register`, `/password-recovery`): 5 attempts / 15 min per IP.
     * **Authentication**: JWT-based via Bearer Token.
 
 servers:
-  - url: https://api.example.com/v1
+  - url: http://localhost:8080/
+    description: Local Docker Compose Server
+  - url: https://api.example.com/
     description: Production Server
 
 paths:
@@ -43,6 +45,12 @@ paths:
       responses:
         '201':
           description: User created successfully
+          headers:
+            Location:
+              description: URL of the newly created user resource
+              schema:
+                type: string
+                example: /v1/users/550e8400-e29b-41d4-a716-446655440000
           content:
             application/json:
               schema:
@@ -58,6 +66,9 @@ paths:
               example:
                 message: User created successfully
                 links:
+                  - rel: self
+                    href: /v1/users/550e8400-e29b-41d4-a716-446655440000
+                    method: GET
                   - rel: login
                     href: /v1/auth/login
                     method: POST

@@ -124,6 +124,7 @@ func (h *Handler) Register(c echo.Context) error {
 		})
 	}
 
+	c.Response().Header().Set("Location", fmt.Sprintf("/v1/users/%s", userID))
 	return c.JSON(http.StatusCreated, models.RegisterResponse{
 		UserID:  userID,
 		Message: "User created successfully",

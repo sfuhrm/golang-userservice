@@ -41,7 +41,11 @@ func main() {
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins: []string{"https://*.example.com"},
+		AllowOrigins: []string{
+			"https://*.example.com",
+			"http://localhost:8081",
+			"http://127.0.0.1:8081",
+		},
 		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.OPTIONS},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 	}))
