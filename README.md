@@ -1,9 +1,14 @@
 # User Service API
 
+[![Build and Deploy](https://github.com/sfuhrm/golang-userservice/actions/workflows/docker.yml/badge.svg)](https://github.com/sfuhrm/golang-userservice/actions/workflows/docker.yml)
 [![Coverage](https://raw.githubusercontent.com/sfuhrm/golang-userservice/refs/heads/gh-pages/coverage_badge.svg)](https://sfuhrm.github.io/golang-userservice/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) 
 
 A RESTful API service for user registration, authentication, and account management built with Go and Echo framework.
+
+## Status
+
+:warning: Experimental status! Largely untested! Password recovery via email not implemented. Features / API may change. Use with caution.
 
 ## Features
 
@@ -18,6 +23,7 @@ A RESTful API service for user registration, authentication, and account managem
 - Rate limiting on authentication endpoints
 - CORS support for web applications
 - Database migrations with goose
+- Small memory footprint of around 10 MB
 
 ## Prerequisites
 
