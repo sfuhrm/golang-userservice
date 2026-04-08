@@ -1,0 +1,393 @@
+package middleware
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/labstack/echo/v4"
+	"userservice/config"
+	"userservice/models"
+)
+
+func TestGenerateAccessToken(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+
+	if token == "" {
+		t.Error("GenerateAccessToken() should return a non-empty token")
+	}
+}
+
+func TestGenerateAccessToken_WithMultipleRoles(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser, models.RoleAdmin}, cfg)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+
+	if token == "" {
+		t.Error("GenerateAccessToken() should return a non-empty token")
+	}
+}
+
+func TestJWTAuth_MissingHeader(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_InvalidFormat(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "InvalidFormat token123")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_InvalidToken(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer invalid.token.here")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_ExpiredToken(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: -1 * time.Hour,
+	}
+
+	token, _ := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_ValidToken(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		userID := c.Get("userID").(string)
+		return c.String(http.StatusOK, userID)
+	})
+
+	err = handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	if rec.Body.String() != "user-123" {
+		t.Errorf("JWTAuth() userID = %s, want user-123", rec.Body.String())
+	}
+}
+
+func TestJWTAuth_ExtractsRoles(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token, _ := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser, models.RoleAdmin}, cfg)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		roles := c.Get("roles").([]models.UserRole)
+		return c.String(http.StatusOK, strconv.Itoa(len(roles)))
+	})
+
+	handler(c)
+
+	if rec.Body.String() != "2" {
+		t.Errorf("JWTAuth() roles count = %s, want 2", rec.Body.String())
+	}
+}
+
+func TestRequireRole_Allowed(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("roles", []models.UserRole{models.RoleAdmin})
+
+	handler := RequireRole(models.RoleAdmin)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("RequireRole() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("RequireRole() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestRequireRole_Forbidden(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("roles", []models.UserRole{models.RoleUser})
+
+	handler := RequireRole(models.RoleAdmin)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("RequireRole() error = %v", err)
+	}
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("RequireRole() status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestRequireRole_NoRole(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := RequireRole(models.RoleAdmin)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("RequireRole() error = %v", err)
+	}
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("RequireRole() status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestRequireRole_MultipleRoles(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set("roles", []models.UserRole{models.RoleUser, models.RoleAdmin})
+
+	handler := RequireRole(models.RoleAdmin)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("RequireRole() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("RequireRole() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestRateLimiter_Allow(t *testing.T) {
+	rl := NewRateLimiter(5, time.Minute)
+
+	for i := 0; i < 5; i++ {
+		if !rl.Allow("192.168.1.1") {
+			t.Errorf("Request %d should be allowed", i+1)
+		}
+	}
+
+	if rl.Allow("192.168.1.1") {
+		t.Error("Request 6 should be denied")
+	}
+
+	if !rl.Allow("192.168.1.2") {
+		t.Error("New IP should be allowed")
+	}
+}
+
+func TestRateLimiter_WindowExpiry(t *testing.T) {
+	rl := NewRateLimiter(2, 50*time.Millisecond)
+
+	if !rl.Allow("192.168.1.1") {
+		t.Error("First request should be allowed")
+	}
+	if !rl.Allow("192.168.1.1") {
+		t.Error("Second request should be allowed")
+	}
+	if rl.Allow("192.168.1.1") {
+		t.Error("Third request should be denied")
+	}
+
+	time.Sleep(60 * time.Millisecond)
+
+	if !rl.Allow("192.168.1.1") {
+		t.Error("Request after window expiry should be allowed")
+	}
+}
+
+func TestRateLimiter_Middleware_AllowsRequest(t *testing.T) {
+	rl := NewRateLimiter(100, time.Minute)
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := rl.Middleware()(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("RateLimiter.Middleware() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("RateLimiter.Middleware() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestRateLimiter_Middleware_BlocksRequest(t *testing.T) {
+	rl := NewRateLimiter(1, time.Minute)
+
+	rl.Allow("192.168.1.1")
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.RemoteAddr = "192.168.1.1:12345"
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := rl.Middleware()(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err := handler(c)
+
+	if err != nil {
+		t.Errorf("RateLimiter.Middleware() error = %v", err)
+	}
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Errorf("RateLimiter.Middleware() status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+
+	retryAfter := rec.Header().Get("Retry-After")
+	if retryAfter == "" {
+		t.Error("Retry-After header should be set")
+	}
+}

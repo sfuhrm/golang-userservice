@@ -56,6 +56,12 @@ func ResetCoverage() {
 	coveredRoutes = make(map[string]bool)
 }
 
+func setCoveredRoutesForTest(routes map[string]bool) {
+	coverageLock.Lock()
+	defer coverageLock.Unlock()
+	coveredRoutes = routes
+}
+
 func GetAllRoutes() []string {
 	return []string{
 		"/v1/auth/login",
