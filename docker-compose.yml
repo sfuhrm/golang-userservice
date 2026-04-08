@@ -12,6 +12,10 @@ services:
       - DB_PASSWORD=userservice
       - DB_NAME=userservice
       - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      # - REGISTRATION_MAIL_URL=http://mail-service/register
+      # - REGISTRATION_MAIL_CALLBACK_URL=http://localhost:8080/v1/auth/verify-registration
+      # - RECOVERY_MAIL_URL=http://mail-service/recover
+      # - RECOVERY_MAIL_CALLBACK_URL=http://localhost:8080/v1/auth/verify-recovery
     volumes:
       - ./secrets:/run/secrets:ro
     depends_on:

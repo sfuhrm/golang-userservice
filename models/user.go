@@ -15,6 +15,14 @@ const (
 	RoleAdmin UserRole = "admin"
 )
 
+// TokenType represents the type of verification token.
+type TokenType string
+
+const (
+	TokenTypeRegistration TokenType = "registration"
+	TokenTypeRecovery     TokenType = "recovery"
+)
+
 // User represents a user entity in the database.
 // PasswordHash is excluded from JSON serialization for security.
 type User struct {
@@ -34,6 +42,16 @@ type RefreshToken struct {
 	ID        string    `json:"id"`        // Unique token identifier (UUID)
 	UserID    string    `json:"userId"`    // Associated user ID
 	Token     string    `json:"token"`     // The refresh token value
+	ExpiresAt time.Time `json:"expiresAt"` // Token expiration timestamp
+	CreatedAt time.Time `json:"createdAt"` // Token creation timestamp
+}
+
+// VerificationToken represents a token for email verification or password recovery.
+type VerificationToken struct {
+	ID        string    `json:"id"`        // Unique token identifier (UUID)
+	UserID    string    `json:"userId"`    // Associated user ID
+	Token     string    `json:"token"`     // The verification token value
+	Type      TokenType `json:"type"`      // Token type (registration or recovery)
 	ExpiresAt time.Time `json:"expiresAt"` // Token expiration timestamp
 	CreatedAt time.Time `json:"createdAt"` // Token creation timestamp
 }
@@ -156,4 +174,30 @@ type UserListResponse struct {
 	Page       int         `json:"page"`       // Current page
 	PageSize   int         `json:"pageSize"`   // Page size
 	Links      []Link      `json:"links"`      // Hypermedia links
+}
+
+// RegistrationMailRequest represents the request body sent to external registration mail service.
+type RegistrationMailRequest struct {
+	Username string `json:"username"` // User's username
+	Email    string `json:"email"`    // User's email address
+	Token    string `json:"token"`    // Verification token
+	Callback string `json:"callback"` // Callback URL for verification
+}
+
+// RecoveryMailRequest represents the request body sent to external recovery mail service.
+type RecoveryMailRequest struct {
+	Email    string `json:"email"`    // User's email address
+	Token    string `json:"token"`    // Recovery token
+	Callback string `json:"callback"` // Callback URL for verification
+}
+
+// VerifyRegistrationRequest represents the request body for email verification.
+type VerifyRegistrationRequest struct {
+	Token string `json:"token"` // Verification token from email
+}
+
+// ResetPasswordRequest represents the request body for password reset with token.
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`       // Recovery token from email
+	NewPassword string `json:"newPassword"` // New password (8-128 chars)
 }

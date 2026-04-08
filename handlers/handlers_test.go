@@ -213,6 +213,130 @@ func TestRegister_UserConflict(t *testing.T) {
 	}
 }
 
+func TestRegister_WithMailService_Success(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	e := echo.New()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("Expected POST request, got %s", r.Method)
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		}
+
+		var reqBody models.RegistrationMailRequest
+		json.NewDecoder(r.Body).Decode(&reqBody)
+
+		if reqBody.Username != "testuser" {
+			t.Errorf("Expected username testuser, got %s", reqBody.Username)
+		}
+		if reqBody.Email != "test@example.com" {
+			t.Errorf("Expected email test@example.com, got %s", reqBody.Email)
+		}
+		if reqBody.Token == "" {
+			t.Error("Expected non-empty token")
+		}
+		if reqBody.Callback != "http://localhost:8080/v1/auth/verify-registration" {
+			t.Errorf("Expected callback URL, got %s", reqBody.Callback)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	h := New(db, &config.Config{
+		JWTSecret:                "test-secret-key",
+		JWTExpire:                15 * time.Minute,
+		RefreshExpire:            7 * 24 * time.Hour,
+		RateLimit:                100,
+		RateLimitWindow:          15 * time.Minute,
+		AuthRateLimit:            5,
+		RegistrationMailURL:      server.URL,
+		RegistrationMailCallback: "http://localhost:8080/v1/auth/verify-registration",
+	})
+
+	mock.ExpectQuery("SELECT COUNT").WithArgs("testuser", "test@example.com").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectExec("INSERT INTO users").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO user_roles").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO verification_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
+
+	reqBody := `{"username":"testuser","email":"test@example.com","password":"password123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/users", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := h.Register(c); err != nil {
+		t.Errorf("Register() error = %v", err)
+	}
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Register() status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+}
+
+func TestRegister_WithMailService_Failure(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	e := echo.New()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	h := New(db, &config.Config{
+		JWTSecret:                "test-secret-key",
+		JWTExpire:                15 * time.Minute,
+		RefreshExpire:            7 * 24 * time.Hour,
+		RateLimit:                100,
+		RateLimitWindow:          15 * time.Minute,
+		AuthRateLimit:            5,
+		RegistrationMailURL:      server.URL,
+		RegistrationMailCallback: "http://localhost:8080/v1/auth/verify-registration",
+	})
+
+	mock.ExpectQuery("SELECT COUNT").WithArgs("testuser", "test@example.com").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	mock.ExpectExec("INSERT INTO users").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO user_roles").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec("INSERT INTO verification_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
+
+	reqBody := `{"username":"testuser","email":"test@example.com","password":"password123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/users", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := h.Register(c); err != nil {
+		t.Errorf("Register() error = %v", err)
+	}
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("Register() status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var resp models.ErrorResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+
+	if resp.Code != "INTERNAL_ERROR" {
+		t.Errorf("Register() error code = %s, want INTERNAL_ERROR", resp.Code)
+	}
+}
+
 func TestLogin_Success(t *testing.T) {
 	h, mock, e := newTestHandler(t)
 	defer h.db.Close()
@@ -932,9 +1056,81 @@ func TestChangePassword_IncorrectCurrentPassword(t *testing.T) {
 	}
 }
 
-func TestPasswordRecovery_ValidEmail(t *testing.T) {
+func TestPasswordRecovery_NotImplemented(t *testing.T) {
 	h, _, e := newTestHandler(t)
 	defer h.db.Close()
+
+	reqBody := `{"email":"test@example.com"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/password-recovery", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := h.PasswordRecovery(c); err != nil {
+		t.Errorf("PasswordRecovery() error = %v", err)
+	}
+
+	if rec.Code != http.StatusNotImplemented {
+		t.Errorf("PasswordRecovery() status = %d, want %d", rec.Code, http.StatusNotImplemented)
+	}
+
+	var resp models.ErrorResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+
+	if resp.Code != "NOT_IMPLEMENTED" {
+		t.Errorf("PasswordRecovery() error code = %s, want NOT_IMPLEMENTED", resp.Code)
+	}
+}
+
+func TestPasswordRecovery_ValidEmail_WithMailService(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	e := echo.New()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("Expected POST request, got %s", r.Method)
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		}
+
+		var reqBody models.RecoveryMailRequest
+		json.NewDecoder(r.Body).Decode(&reqBody)
+
+		if reqBody.Email != "test@example.com" {
+			t.Errorf("Expected email test@example.com, got %s", reqBody.Email)
+		}
+		if reqBody.Token == "" {
+			t.Error("Expected non-empty token")
+		}
+		if reqBody.Callback != "http://localhost:8080/v1/auth/verify-recovery" {
+			t.Errorf("Expected callback URL, got %s", reqBody.Callback)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	h := New(db, &config.Config{
+		JWTSecret:            "test-secret-key",
+		JWTExpire:            15 * time.Minute,
+		RefreshExpire:        7 * 24 * time.Hour,
+		RateLimit:            100,
+		RateLimitWindow:      15 * time.Minute,
+		AuthRateLimit:        5,
+		RecoveryMailURL:      server.URL,
+		RecoveryMailCallback: "http://localhost:8080/v1/auth/verify-recovery",
+	})
+
+	mock.ExpectQuery("SELECT id FROM users").WithArgs("test@example.com").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("user-123"))
+	mock.ExpectExec("INSERT INTO verification_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
 
 	reqBody := `{"email":"test@example.com"}`
 
@@ -953,8 +1149,29 @@ func TestPasswordRecovery_ValidEmail(t *testing.T) {
 }
 
 func TestPasswordRecovery_InvalidEmail(t *testing.T) {
-	h, _, e := newTestHandler(t)
-	defer h.db.Close()
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	e := echo.New()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	h := New(db, &config.Config{
+		JWTSecret:            "test-secret-key",
+		JWTExpire:            15 * time.Minute,
+		RefreshExpire:        7 * 24 * time.Hour,
+		RateLimit:            100,
+		RateLimitWindow:      15 * time.Minute,
+		AuthRateLimit:        5,
+		RecoveryMailURL:      server.URL,
+		RecoveryMailCallback: "http://localhost:8080/v1/auth/verify-recovery",
+	})
 
 	testCases := []struct {
 		name  string
@@ -991,8 +1208,29 @@ func TestPasswordRecovery_InvalidEmail(t *testing.T) {
 }
 
 func TestPasswordRecovery_InvalidJSON(t *testing.T) {
-	h, _, e := newTestHandler(t)
-	defer h.db.Close()
+	db, _, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	e := echo.New()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	h := New(db, &config.Config{
+		JWTSecret:            "test-secret-key",
+		JWTExpire:            15 * time.Minute,
+		RefreshExpire:        7 * 24 * time.Hour,
+		RateLimit:            100,
+		RateLimitWindow:      15 * time.Minute,
+		AuthRateLimit:        5,
+		RecoveryMailURL:      server.URL,
+		RecoveryMailCallback: "http://localhost:8080/v1/auth/verify-recovery",
+	})
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/auth/password-recovery", strings.NewReader("invalid"))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -1394,5 +1632,198 @@ func TestUpdateUser_NotFound(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("UpdateUser() status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestVerifyRegistration_Success(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"valid-token-123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/verify-registration", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	now := time.Now()
+	tokenRows := sqlmock.NewRows([]string{"id", "user_id", "token", "type", "expires_at"}).
+		AddRow("token-id", "user-123", "valid-token-123", "registration", now.Add(24*time.Hour))
+	mock.ExpectQuery("SELECT .+ FROM verification_tokens").WillReturnRows(tokenRows)
+	mock.ExpectExec("UPDATE users").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("DELETE FROM verification_tokens").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := h.VerifyRegistration(c); err != nil {
+		t.Errorf("VerifyRegistration() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("VerifyRegistration() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestVerifyRegistration_InvalidToken(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"invalid-token"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/verify-registration", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mock.ExpectQuery("SELECT .+ FROM verification_tokens").WillReturnError(sql.ErrNoRows)
+
+	h.VerifyRegistration(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("VerifyRegistration() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	var resp models.ErrorResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+
+	if resp.Code != "INVALID_TOKEN" {
+		t.Errorf("VerifyRegistration() error code = %s, want INVALID_TOKEN", resp.Code)
+	}
+}
+
+func TestVerifyRegistration_ExpiredToken(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"expired-token"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/verify-registration", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	expiredTime := time.Now().Add(-1 * time.Hour)
+	tokenRows := sqlmock.NewRows([]string{"id", "user_id", "token", "type", "expires_at"}).
+		AddRow("token-id", "user-123", "expired-token", "registration", expiredTime)
+	mock.ExpectQuery("SELECT .+ FROM verification_tokens").WillReturnRows(tokenRows)
+
+	h.VerifyRegistration(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("VerifyRegistration() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	var resp models.ErrorResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+
+	if resp.Code != "INVALID_TOKEN" {
+		t.Errorf("VerifyRegistration() error code = %s, want INVALID_TOKEN", resp.Code)
+	}
+}
+
+func TestVerifyRegistration_MissingToken(t *testing.T) {
+	h, _, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":""}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/verify-registration", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	h.VerifyRegistration(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("VerifyRegistration() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestResetPassword_Success(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"valid-recovery-token","newPassword":"newpassword123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/reset-password", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	now := time.Now()
+	tokenRows := sqlmock.NewRows([]string{"id", "user_id", "token", "type", "expires_at"}).
+		AddRow("token-id", "user-123", "valid-recovery-token", "recovery", now.Add(1*time.Hour))
+	mock.ExpectQuery("SELECT .+ FROM verification_tokens").WillReturnRows(tokenRows)
+	mock.ExpectExec("UPDATE users").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("DELETE FROM verification_tokens").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("DELETE FROM refresh_tokens").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := h.ResetPassword(c); err != nil {
+		t.Errorf("ResetPassword() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("ResetPassword() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestResetPassword_InvalidToken(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"invalid-token","newPassword":"newpassword123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/reset-password", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mock.ExpectQuery("SELECT .+ FROM verification_tokens").WillReturnError(sql.ErrNoRows)
+
+	h.ResetPassword(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("ResetPassword() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	var resp models.ErrorResponse
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+
+	if resp.Code != "INVALID_TOKEN" {
+		t.Errorf("ResetPassword() error code = %s, want INVALID_TOKEN", resp.Code)
+	}
+}
+
+func TestResetPassword_InvalidPassword(t *testing.T) {
+	h, _, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"valid-token","newPassword":"short"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/reset-password", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	h.ResetPassword(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("ResetPassword() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestResetPassword_MissingToken(t *testing.T) {
+	h, _, e := newTestHandler(t)
+	defer h.db.Close()
+
+	reqBody := `{"token":"","newPassword":"newpassword123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/reset-password", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	h.ResetPassword(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("ResetPassword() status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

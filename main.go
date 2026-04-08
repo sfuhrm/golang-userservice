@@ -78,6 +78,8 @@ func main() {
 	apiAuth.POST("/refresh", h.Refresh, authLimiter.Middleware())
 	apiAuth.POST("/logout", h.Logout, middleware.JWTAuth(cfg))
 	apiAuth.POST("/password-recovery", h.PasswordRecovery, authLimiter.Middleware())
+	apiAuth.POST("/verify-registration", h.VerifyRegistration)
+	apiAuth.POST("/reset-password", h.ResetPassword)
 
 	api.POST("/users", h.Register)
 	api.PUT("/users/:id/password", h.ChangePassword, middleware.JWTAuth(cfg))

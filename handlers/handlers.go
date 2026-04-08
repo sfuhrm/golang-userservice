@@ -3,6 +3,7 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -23,13 +24,18 @@ import (
 // Handler holds the dependencies for HTTP handlers.
 // Provides access to the database and configuration.
 type Handler struct {
-	db  *sql.DB        // Database connection
-	cfg *config.Config // Application configuration
+	db         *sql.DB        // Database connection
+	cfg        *config.Config // Application configuration
+	httpClient *http.Client   // HTTP client for external service calls
 }
 
 // New creates a new Handler instance with the provided dependencies.
 func New(db *sql.DB, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+	return &Handler{
+		db:         db,
+		cfg:        cfg,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 // getUserRoles retrieves all roles for a user from the database.
@@ -56,8 +62,62 @@ func (h *Handler) getUserRoles(userID string) ([]models.UserRole, error) {
 	return roles, nil
 }
 
+// sendRegistrationMail sends a registration verification email via external service.
+func (h *Handler) sendRegistrationMail(username, email, token string) error {
+	reqBody := models.RegistrationMailRequest{
+		Username: username,
+		Email:    email,
+		Token:    token,
+		Callback: h.cfg.RegistrationMailCallback,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	resp, err := h.httpClient.Post(h.cfg.RegistrationMailURL, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("registration mail service returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// sendRecoveryMail sends a password recovery email via external service.
+func (h *Handler) sendRecoveryMail(email, token string) error {
+	reqBody := models.RecoveryMailRequest{
+		Email:    email,
+		Token:    token,
+		Callback: h.cfg.RecoveryMailCallback,
+	}
+
+	jsonBody, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	resp, err := h.httpClient.Post(h.cfg.RecoveryMailURL, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("recovery mail service returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // Register handles user registration requests.
 // Creates a new user account with hashed password and default "user" role.
+// If REGISTRATION_MAIL_URL is configured, calls the external service to send verification email.
 // Returns 201 Created on success, 400 for validation errors, 409 for conflicts.
 func (h *Handler) Register(c echo.Context) error {
 	var req models.RegisterRequest
@@ -122,6 +182,29 @@ func (h *Handler) Register(c echo.Context) error {
 			Code:    "INTERNAL_ERROR",
 			Message: "Failed to assign default role",
 		})
+	}
+
+	if h.cfg.RegistrationMailURL != "" {
+		token := uuid.New().String()
+		tokenExpires := now.Add(24 * time.Hour)
+
+		_, err = h.db.Exec(
+			"INSERT INTO verification_tokens (id, user_id, token, type, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+			uuid.New().String(), userID, token, models.TokenTypeRegistration, tokenExpires, now,
+		)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+				Code:    "INTERNAL_ERROR",
+				Message: "Failed to store verification token",
+			})
+		}
+
+		if err := h.sendRegistrationMail(req.Username, req.Email, token); err != nil {
+			return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+				Code:    "INTERNAL_ERROR",
+				Message: "Failed to send registration email",
+			})
+		}
 	}
 
 	c.Response().Header().Set("Location", fmt.Sprintf("/v1/users/%s", userID))
@@ -570,9 +653,16 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 }
 
 // PasswordRecovery initiates the password recovery process.
-// Validates email format and returns 202 Accepted (actual email sending is a stub).
-// In production, this would trigger an email with a reset link.
+// If RECOVERY_MAIL_URL is configured, calls the external service to send recovery email.
+// If RECOVERY_MAIL_URL is not configured, returns 501 Not Implemented.
 func (h *Handler) PasswordRecovery(c echo.Context) error {
+	if h.cfg.RecoveryMailURL == "" {
+		return c.JSON(http.StatusNotImplemented, models.ErrorResponse{
+			Code:    "NOT_IMPLEMENTED",
+			Message: "Password recovery service is not configured",
+		})
+	}
+
 	var req struct {
 		Email string `json:"email"`
 	}
@@ -591,7 +681,187 @@ func (h *Handler) PasswordRecovery(c echo.Context) error {
 		})
 	}
 
+	var userID string
+	err := h.db.QueryRow("SELECT id FROM users WHERE email = ?", req.Email).Scan(&userID)
+	if err == sql.ErrNoRows {
+		return c.JSON(http.StatusAccepted, nil)
+	}
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to check user",
+		})
+	}
+
+	now := time.Now()
+	token := uuid.New().String()
+	tokenExpires := now.Add(1 * time.Hour)
+
+	_, err = h.db.Exec(
+		"INSERT INTO verification_tokens (id, user_id, token, type, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+		uuid.New().String(), userID, token, models.TokenTypeRecovery, tokenExpires, now,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to store recovery token",
+		})
+	}
+
+	if err := h.sendRecoveryMail(req.Email, token); err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to send recovery email",
+		})
+	}
+
 	return c.JSON(http.StatusAccepted, nil)
+}
+
+// VerifyRegistration verifies a user's email using the registration verification token.
+func (h *Handler) VerifyRegistration(c echo.Context) error {
+	var req models.VerifyRegistrationRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "VALIDATION_ERROR",
+			Message: "Invalid request body",
+		})
+	}
+
+	if req.Token == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "VALIDATION_ERROR",
+			Message: "Token is required",
+		})
+	}
+
+	var tokenRecord models.VerificationToken
+	err := h.db.QueryRow(
+		"SELECT id, user_id, token, type, expires_at FROM verification_tokens WHERE token = ? AND type = ?",
+		req.Token, models.TokenTypeRegistration,
+	).Scan(&tokenRecord.ID, &tokenRecord.UserID, &tokenRecord.Token, &tokenRecord.Type, &tokenRecord.ExpiresAt)
+
+	if err == sql.ErrNoRows {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "INVALID_TOKEN",
+			Message: "Invalid or expired verification token",
+		})
+	}
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to validate token",
+		})
+	}
+
+	if tokenRecord.ExpiresAt.Before(time.Now()) {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "INVALID_TOKEN",
+			Message: "Verification token has expired",
+		})
+	}
+
+	_, err = h.db.Exec("UPDATE users SET email_verified = ?, updated_at = ? WHERE id = ?", true, time.Now(), tokenRecord.UserID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to verify email",
+		})
+	}
+
+	_, err = h.db.Exec("DELETE FROM verification_tokens WHERE id = ?", tokenRecord.ID)
+	if err != nil {
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Email verified successfully",
+		"links": []models.Link{
+			{Rel: "login", Href: "/v1/auth/login", Method: "POST"},
+		},
+	})
+}
+
+// ResetPassword resets a user's password using a recovery token.
+func (h *Handler) ResetPassword(c echo.Context) error {
+	var req models.ResetPasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "VALIDATION_ERROR",
+			Message: "Invalid request body",
+		})
+	}
+
+	if req.Token == "" {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "VALIDATION_ERROR",
+			Message: "Token is required",
+		})
+	}
+
+	if len(req.NewPassword) < 8 || len(req.NewPassword) > 128 {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "VALIDATION_ERROR",
+			Message: "Password must be between 8 and 128 characters",
+		})
+	}
+
+	var tokenRecord models.VerificationToken
+	err := h.db.QueryRow(
+		"SELECT id, user_id, token, type, expires_at FROM verification_tokens WHERE token = ? AND type = ?",
+		req.Token, models.TokenTypeRecovery,
+	).Scan(&tokenRecord.ID, &tokenRecord.UserID, &tokenRecord.Token, &tokenRecord.Type, &tokenRecord.ExpiresAt)
+
+	if err == sql.ErrNoRows {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "INVALID_TOKEN",
+			Message: "Invalid or expired recovery token",
+		})
+	}
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to validate token",
+		})
+	}
+
+	if tokenRecord.ExpiresAt.Before(time.Now()) {
+		return c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Code:    "INVALID_TOKEN",
+			Message: "Recovery token has expired",
+		})
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to process new password",
+		})
+	}
+
+	now := time.Now()
+	_, err = h.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", string(newHash), now, tokenRecord.UserID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to reset password",
+		})
+	}
+
+	_, err = h.db.Exec("DELETE FROM verification_tokens WHERE user_id = ? AND type = ?", tokenRecord.UserID, models.TokenTypeRecovery)
+	if err != nil {
+	}
+
+	_, err = h.db.Exec("DELETE FROM refresh_tokens WHERE user_id = ?", tokenRecord.UserID)
+	if err != nil {
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Password reset successfully",
+		"links": []models.Link{
+			{Rel: "login", Href: "/v1/auth/login", Method: "POST"},
+		},
+	})
 }
 
 // generateTokens creates a new access/refresh token pair for the given user.

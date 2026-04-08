@@ -11,18 +11,22 @@ import (
 // Config holds all application configuration settings.
 // These values are loaded from environment variables at startup.
 type Config struct {
-	ServerPort      string        // HTTP server port (default: 8080)
-	DBHost          string        // Database host address (default: mariadb)
-	DBPort          string        // Database port (default: 3306)
-	DBUser          string        // Database username (default: userservice)
-	DBPassword      string        // Database password (default: userservice)
-	DBName          string        // Database name (default: userservice)
-	JWTSecret       string        // Secret key for signing JWT tokens
-	JWTExpire       time.Duration // Access token expiration time (default: 15 minutes)
-	RefreshExpire   time.Duration // Refresh token expiration time (default: 7 days)
-	RateLimit       int           // Standard rate limit requests per window (default: 100)
-	RateLimitWindow time.Duration // Rate limit time window (default: 15 minutes)
-	AuthRateLimit   int           // Auth endpoints rate limit (default: 5)
+	ServerPort               string        // HTTP server port (default: 8080)
+	DBHost                   string        // Database host address (default: mariadb)
+	DBPort                   string        // Database port (default: 3306)
+	DBUser                   string        // Database username (default: userservice)
+	DBPassword               string        // Database password (default: userservice)
+	DBName                   string        // Database name (default: userservice)
+	JWTSecret                string        // Secret key for signing JWT tokens
+	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
+	RefreshExpire            time.Duration // Refresh token expiration time (default: 7 days)
+	RateLimit                int           // Standard rate limit requests per window (default: 100)
+	RateLimitWindow          time.Duration // Rate limit time window (default: 15 minutes)
+	AuthRateLimit            int           // Auth endpoints rate limit (default: 5)
+	RegistrationMailURL      string        // Optional external URL for registration mail service
+	RegistrationMailCallback string        // Callback URL for registration email verification
+	RecoveryMailURL          string        // Optional external URL for recovery mail service
+	RecoveryMailCallback     string        // Callback URL for recovery email verification
 }
 
 // Load returns a new Config instance with values loaded from environment variables.
@@ -30,18 +34,22 @@ type Config struct {
 // JWT secret is read from a file (for Docker secrets) or falls back to env var.
 func Load() *Config {
 	return &Config{
-		ServerPort:      getEnv("SERVER_PORT", "8080"),
-		DBHost:          getEnv("DB_HOST", "mariadb"),
-		DBPort:          getEnv("DB_PORT", "3306"),
-		DBUser:          getEnv("DB_USER", "userservice"),
-		DBPassword:      getEnv("DB_PASSWORD", "userservice"),
-		DBName:          getEnv("DB_NAME", "userservice"),
-		JWTSecret:       getJWTSecret(),
-		JWTExpire:       15 * time.Minute,
-		RefreshExpire:   7 * 24 * time.Hour,
-		RateLimit:       100,
-		RateLimitWindow: 15 * time.Minute,
-		AuthRateLimit:   5,
+		ServerPort:               getEnv("SERVER_PORT", "8080"),
+		DBHost:                   getEnv("DB_HOST", "mariadb"),
+		DBPort:                   getEnv("DB_PORT", "3306"),
+		DBUser:                   getEnv("DB_USER", "userservice"),
+		DBPassword:               getEnv("DB_PASSWORD", "userservice"),
+		DBName:                   getEnv("DB_NAME", "userservice"),
+		JWTSecret:                getJWTSecret(),
+		JWTExpire:                15 * time.Minute,
+		RefreshExpire:            7 * 24 * time.Hour,
+		RateLimit:                100,
+		RateLimitWindow:          15 * time.Minute,
+		AuthRateLimit:            5,
+		RegistrationMailURL:      getEnv("REGISTRATION_MAIL_URL", ""),
+		RegistrationMailCallback: getEnv("REGISTRATION_MAIL_CALLBACK_URL", ""),
+		RecoveryMailURL:          getEnv("RECOVERY_MAIL_URL", ""),
+		RecoveryMailCallback:     getEnv("RECOVERY_MAIL_CALLBACK_URL", ""),
 	}
 }
 

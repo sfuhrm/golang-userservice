@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: User Service API
-  version: 1.1.0
+  version: 1.3.0
   description: |
     API for user registration, authentication, and account management.
     
@@ -11,6 +11,17 @@ info:
       * Standard: 100 requests / 15 min per IP.
       * Auth Endpoints (`/login`, `/register`, `/password-recovery`): 5 attempts / 15 min per IP.
     * **Authentication**: JWT-based via Bearer Token.
+    
+    ### External Mail Service Integration
+    This service supports optional integration with external mail services for registration and password recovery emails.
+    
+    **Environment Variables:**
+    - `REGISTRATION_MAIL_URL`: Optional external URL for sending registration verification emails. If not set, users are created directly without email verification.
+    - `REGISTRATION_MAIL_CALLBACK_URL`: Callback URL for registration verification (included in mail request).
+    - `RECOVERY_MAIL_URL`: Optional external URL for sending password recovery emails. If not set, returns HTTP 501.
+    - `RECOVERY_MAIL_CALLBACK_URL`: Callback URL for password recovery (included in mail request).
+    
+    When configured, these URLs receive POST requests with JSON body containing the user data and verification token.
 
 servers:
   - url: http://localhost:8080/
@@ -23,8 +34,13 @@ paths:
     post:
       summary: Register a new user
       description: |
-        Creates a new user account. An email verification link will be sent to the provided email address.
-        The account will only be activated once the user clicks the verification link.
+        Creates a new user account.
+        
+        **Mail Service Integration:**
+        - If `REGISTRATION_MAIL_URL` environment variable is configured, the service calls this URL with a POST request to send a verification email.
+        - The request body contains: `username`, `email`, `token`, and `callback` URL.
+        - If the mail service call fails, returns HTTP 500.
+        - If `REGISTRATION_MAIL_URL` is not configured, the user is created directly (existing behavior).
         
         **Validation Rules:**
         - Username: 3-30 characters, alphanumeric and underscores only
@@ -90,6 +106,15 @@ paths:
               example:
                 code: CONFLICT
                 message: Username or email already exists
+        '500':
+          description: Internal error - Failed to send registration email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INTERNAL_ERROR
+                message: Failed to send registration email
         '429':
           $ref: '#/components/responses/TooManyRequests'
 
@@ -312,11 +337,13 @@ paths:
     post:
       summary: Initiate password reset
       description: |
-        Initiates the password recovery process.
-        An email with password reset instructions will be sent to the user's email address.
+        Initiates the password recovery process by sending a recovery email via external mail service.
         
-        **Note:** This endpoint currently returns 202 Accepted for all valid email addresses
-        to prevent email enumeration. Check your email logs for actual reset links.
+        **Mail Service Integration:**
+        - Requires `RECOVERY_MAIL_URL` environment variable to be configured.
+        - If configured, calls the external URL with a POST request containing: `email`, `token`, and `callback` URL.
+        - If `RECOVERY_MAIL_URL` is not configured, returns HTTP 501 Not Implemented.
+        - Returns 202 Accepted for valid email addresses to prevent email enumeration.
       tags:
         - Authentication
       requestBody:
@@ -334,7 +361,7 @@ paths:
                   example: john@example.com
       responses:
         '202':
-          description: Request accepted (Email will be sent)
+          description: Request accepted (Recovery email will be sent)
           content:
             application/json:
               schema:
@@ -343,8 +370,159 @@ paths:
                   message:
                     type: string
                     example: If an account exists with this email, a recovery email has been sent
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: VALIDATION_ERROR
+                message: Invalid email format
+        '501':
+          description: Not implemented - Recovery mail service not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: NOT_IMPLEMENTED
+                message: Password recovery service is not configured
+        '500':
+          description: Internal error - Failed to send recovery email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: INTERNAL_ERROR
+                message: Failed to send recovery email
         '429':
           $ref: '#/components/responses/TooManyRequests'
+
+  /v1/auth/verify-registration:
+    post:
+      summary: Verify email registration
+      description: |
+        Verifies a user's email address using the verification token sent during registration.
+        
+        **Token Storage:**
+        - Tokens are stored in the database with a 24-hour expiration.
+        - Tokens are deleted after successful verification.
+        - Users can only login after email verification if registration mail is configured.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRegistrationRequest'
+            example:
+              token: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully
+                  links:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Link'
+              example:
+                message: Email verified successfully
+                links:
+                  - rel: login
+                    href: /v1/auth/login
+                    method: POST
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  summary: Invalid token
+                  value:
+                    code: INVALID_TOKEN
+                    message: Invalid or expired verification token
+                expired:
+                  summary: Expired token
+                  value:
+                    code: INVALID_TOKEN
+                    message: Verification token has expired
+
+  /v1/auth/reset-password:
+    post:
+      summary: Reset password with recovery token
+      description: |
+        Resets a user's password using a recovery token received via email.
+        
+        **Token Storage:**
+        - Tokens are stored in the database with a 1-hour expiration.
+        - Tokens are deleted after successful password reset.
+        - All existing refresh tokens are invalidated after password reset.
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+            example:
+              token: 550e8400-e29b-41d4-a716-446655440000
+              newPassword: newSecurePassword123
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset successfully
+                  links:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Link'
+              example:
+                message: Password reset successfully
+                links:
+                  - rel: login
+                    href: /v1/auth/login
+                    method: POST
+        '400':
+          description: Invalid or expired token, or invalid password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_token:
+                  summary: Invalid token
+                  value:
+                    code: INVALID_TOKEN
+                    message: Invalid or expired recovery token
+                expired_token:
+                  summary: Expired token
+                  value:
+                    code: INVALID_TOKEN
+                    message: Recovery token has expired
+                invalid_password:
+                  summary: Invalid password
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Password must be between 8 and 128 characters
 
   /v1/users/{id}:
     parameters:
@@ -1199,6 +1377,82 @@ components:
             href: /v1/admin/users?page=1&pageSize=20
           - rel: next
             href: /v1/admin/users?page=2&pageSize=20
+
+    RegistrationMailRequest:
+      type: object
+      description: |
+        Request body sent to external registration mail service.
+        This is a POST request with Content-Type: application/json.
+      properties:
+        username:
+          $ref: '#/components/schemas/Username'
+          description: User's username
+        email:
+          $ref: '#/components/schemas/Email'
+          description: User's email address
+        token:
+          type: string
+          description: Verification token for email confirmation
+          example: 550e8400-e29b-41d4-a716-446655440000
+        callback:
+          type: string
+          format: uri
+          description: Callback URL for registration verification
+          example: http://localhost:8080/v1/auth/verify-registration
+      example:
+        username: john_doe
+        email: john@example.com
+        token: 550e8400-e29b-41d4-a716-446655440000
+        callback: http://localhost:8080/v1/auth/verify-registration
+
+    RecoveryMailRequest:
+      type: object
+      description: |
+        Request body sent to external recovery mail service.
+        This is a POST request with Content-Type: application/json.
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+          description: User's email address for password recovery
+        token:
+          type: string
+          description: Recovery token for password reset
+          example: 550e8400-e29b-41d4-a716-446655440000
+        callback:
+          type: string
+          format: uri
+          description: Callback URL for password recovery verification
+          example: http://localhost:8080/v1/auth/verify-recovery
+      example:
+        email: john@example.com
+        token: 550e8400-e29b-41d4-a716-446655440000
+        callback: http://localhost:8080/v1/auth/verify-recovery
+
+    VerifyRegistrationRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Verification token received in registration email
+          example: 550e8400-e29b-41d4-a716-446655440000
+      example:
+        token: 550e8400-e29b-41d4-a716-446655440000
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+          description: Recovery token received in password recovery email
+          example: 550e8400-e29b-41d4-a716-446655440000
+        newPassword:
+          $ref: '#/components/schemas/Password'
+          description: New password to set
+      example:
+        token: 550e8400-e29b-41d4-a716-446655440000
+        newPassword: newSecurePassword123
 
   responses:
     BadRequest:
