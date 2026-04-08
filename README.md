@@ -8,11 +8,12 @@ A RESTful API service for user registration, authentication, and account managem
 
 ## Status
 
-:warning: Experimental status! Largely untested! Password recovery via email not implemented. Features / API may change. Use with caution.
+:warning: Experimental status! Features / API may change. Use with caution.
 
 ## Features
 
-- User registration with email verification flow
+- User registration with email verification via external mail service
+- Password recovery via external mail service
 - JWT-based authentication with access/refresh token pairs
 - Token rotation for security
 - Password change with current password verification
@@ -77,6 +78,17 @@ Configuration is loaded from environment variables.
 | `JWT_SECRET_FILE` | - | Path to file containing JWT secret (for Docker secrets) |
 | `JWT_SECRET` | `your-secret-key-change-in-production` | Secret key for signing JWT tokens (fallback) |
 
+### External Mail Service Configuration (Optional)
+
+When configured, the service integrates with external mail services for sending verification and recovery emails.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REGISTRATION_MAIL_URL` | - | External URL for sending registration verification emails. If not set, users are created directly without email verification. |
+| `REGISTRATION_MAIL_CALLBACK_URL` | - | Callback URL for registration verification (included in mail request) |
+| `RECOVERY_MAIL_URL` | - | External URL for sending password recovery emails. If not set, returns HTTP 501. |
+| `RECOVERY_MAIL_CALLBACK_URL` | - | Callback URL for password recovery verification (included in mail request) |
+
 ### Token Configuration
 
 These are compiled-in defaults and cannot be changed via environment variables:
@@ -97,7 +109,9 @@ These are compiled-in defaults and cannot be changed via environment variables:
 | POST | `/v1/auth/login` | No | Yes (auth) | User login |
 | POST | `/v1/auth/refresh` | No | Yes (auth) | Refresh access token |
 | POST | `/v1/auth/logout` | Yes | Yes | Invalidate refresh token |
-| POST | `/v1/auth/password-recovery` | No | Yes (auth) | Initiate password reset |
+| POST | `/v1/auth/password-recovery` | No | Yes (auth) | Initiate password reset (requires mail service) |
+| POST | `/v1/auth/verify-registration` | No | No | Verify email registration |
+| POST | `/v1/auth/reset-password` | No | No | Reset password with recovery token |
 
 ### Account Management
 
@@ -211,6 +225,27 @@ curl -X POST http://localhost:8080/v1/auth/logout \
   -H "Content-Type: application/json" \
   -d '{
     "refreshToken": "<refresh_token>"
+  }'
+```
+
+### Verify Email Registration
+
+```bash
+curl -X POST http://localhost:8080/v1/auth/verify-registration \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "<verification_token_from_email>"
+  }'
+```
+
+### Reset Password
+
+```bash
+curl -X POST http://localhost:8080/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "<recovery_token_from_email>",
+    "newPassword": "newSecurePassword123"
   }'
 ```
 
@@ -339,5 +374,7 @@ func main() {
 
 - Change `JWT_SECRET` in production to a secure random value
 - Use HTTPS in production (configure your reverse proxy)
-- The password recovery endpoint currently returns 202 Accepted (email sending is a stub)
+- Configure external mail service URLs for production use (see environment variables)
 - Refresh tokens are invalidated server-side on logout and password change
+- All refresh tokens are invalidated after password reset
+- Verification tokens expire after 24 hours (registration) or 1 hour (recovery)
