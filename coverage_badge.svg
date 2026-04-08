@@ -9,14 +9,14 @@
   </clipPath>
   <g clip-path="url(#round)">
     <rect width="87" height="20" fill="#555"/>
-    <rect x="87" width="53" height="20" fill="orange"/>
-    <path d="M0 0h5v20H0z" fill="orange"/>
+    <rect x="87" width="53" height="20" fill="yellow"/>
+    <path d="M0 0h5v20H0z" fill="yellow"/>
     <rect width="140" height="20" fill="url(#smooth)"/>
   </g>
   <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
     <text x="43.5" y="15" fill="#010101" fill-opacity=".3">coverage</text>
     <text x="43.5" y="14">coverage</text>
-    <text x="113.5" y="15" fill="#010101" fill-opacity=".3">57%</text>
-    <text x="113.5" y="14">57%</text>
+    <text x="113.5" y="15" fill="#010101" fill-opacity=".3">65%</text>
+    <text x="113.5" y="14">65%</text>
   </g>
 </svg>
