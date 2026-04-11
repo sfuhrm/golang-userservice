@@ -34,6 +34,13 @@ def expect_status(response, expected, context):
         fail(f"{context} returned {response.status_code}: {response.text}")
 
 
+def with_test_ip(headers=None):
+    merged = dict(headers or {})
+    if "X-Forwarded-For" not in merged:
+        merged["X-Forwarded-For"] = f"198.51.100.{(uuid.uuid4().int % 250) + 1}"
+    return merged
+
+
 def make_user(label):
     unique = uuid.uuid4().hex[:8]
     username = f"{label}_{unique}"
@@ -61,6 +68,7 @@ def login_user(user, expected_status=200):
     response = requests.post(
         f"{BASE_URL}/auth/login",
         json={"email": user["email"], "password": user["password"]},
+        headers=with_test_ip(),
         timeout=10,
     )
     expect_status(response, expected_status, f"Login for {user['username']}")
@@ -182,6 +190,7 @@ def test_e2e():
     response = requests.post(
         f"{BASE_URL}/auth/login",
         json={"email": user["email"], "password": user["password"]},
+        headers=with_test_ip(),
         timeout=10,
     )
     expect_status(response, 403, "Login for disabled account")
@@ -292,6 +301,7 @@ def test_e2e():
     response = requests.post(
         f"{BASE_URL}/auth/password-recovery",
         json={"email": "nonexistent@example.com"},
+        headers=with_test_ip(),
         timeout=10,
     )
     expect_status(response, 501, "Password recovery not configured")
@@ -302,6 +312,7 @@ def test_e2e():
     response = requests.post(
         f"{BASE_URL}/auth/password-recovery",
         json={"email": recovery_user["email"]},
+        headers=with_test_ip(),
         timeout=10,
     )
     if response.status_code == 501:
