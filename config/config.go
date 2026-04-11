@@ -19,6 +19,7 @@ type Config struct {
 	DBName                   string        // Database name (default: userservice)
 	JWTSecret                string        // Secret key for signing JWT tokens
 	JWTIssuer                string        // Optional JWT issuer claim (iss)
+	JWTAudience              string        // Optional JWT audience claim (aud)
 	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
 	RefreshExpire            time.Duration // Refresh token expiration time (default: 7 days)
 	RateLimit                int           // Standard rate limit requests per window (default: 100)
@@ -43,6 +44,7 @@ func Load() *Config {
 		DBName:                   getEnv("DB_NAME", "userservice"),
 		JWTSecret:                getJWTSecret(),
 		JWTIssuer:                getEnv("JWT_ISSUER", ""),
+		JWTAudience:              getEnv("JWT_AUDIENCE", ""),
 		JWTExpire:                15 * time.Minute,
 		RefreshExpire:            7 * 24 * time.Hour,
 		RateLimit:                100,

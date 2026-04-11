@@ -31,9 +31,10 @@ func TestGenerateAccessToken(t *testing.T) {
 
 func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
 	cfg := &config.Config{
-		JWTSecret: "test-secret",
-		JWTIssuer: "userservice",
-		JWTExpire: 15 * time.Minute,
+		JWTSecret:   "test-secret",
+		JWTIssuer:   "userservice",
+		JWTAudience: "userservice-api",
+		JWTExpire:   15 * time.Minute,
 	}
 
 	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
@@ -58,6 +59,18 @@ func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
 	}
 	if claims["iss"] != "userservice" {
 		t.Errorf("iss claim = %v, want userservice", claims["iss"])
+	}
+	switch aud := claims["aud"].(type) {
+	case string:
+		if aud != "userservice-api" {
+			t.Errorf("aud claim = %v, want userservice-api", claims["aud"])
+		}
+	case []interface{}:
+		if len(aud) != 1 || aud[0] != "userservice-api" {
+			t.Errorf("aud claim = %v, want userservice-api", claims["aud"])
+		}
+	default:
+		t.Errorf("aud claim type = %T, want string or []interface{}", claims["aud"])
 	}
 
 	if _, exists := claims["userId"]; exists {
@@ -169,6 +182,46 @@ func TestJWTAuth_InvalidIssuer(t *testing.T) {
 		"sub":   "user-123",
 		"roles": []string{"user"},
 		"iss":   "different-issuer",
+		"iat":   time.Now().Unix(),
+		"exp":   time.Now().Add(15 * time.Minute).Unix(),
+	})
+	tokenString, err := token.SignedString([]byte(cfg.JWTSecret))
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenString)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err = handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_InvalidAudience(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret:   "test-secret",
+		JWTAudience: "userservice-api",
+		JWTExpire:   15 * time.Minute,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":   "user-123",
+		"roles": []string{"user"},
+		"aud":   "different-audience",
 		"iat":   time.Now().Unix(),
 		"exp":   time.Now().Add(15 * time.Minute).Unix(),
 	})

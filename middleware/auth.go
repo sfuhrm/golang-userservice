@@ -112,6 +112,9 @@ func JWTAuth(cfg *config.Config) echo.MiddlewareFunc {
 			if cfg.JWTIssuer != "" {
 				parseOptions = append(parseOptions, jwt.WithIssuer(cfg.JWTIssuer))
 			}
+			if cfg.JWTAudience != "" {
+				parseOptions = append(parseOptions, jwt.WithAudience(cfg.JWTAudience))
+			}
 
 			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 				return []byte(cfg.JWTSecret), nil
@@ -174,6 +177,9 @@ func GenerateAccessToken(userID string, roles []models.UserRole, cfg *config.Con
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.JWTExpire)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
+	}
+	if cfg.JWTAudience != "" {
+		claims.Audience = jwt.ClaimStrings{cfg.JWTAudience}
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
