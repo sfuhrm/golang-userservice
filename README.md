@@ -73,6 +73,7 @@ Configuration is loaded from environment variables.
 | `DB_HOST` | `mariadb` | Database host address |
 | `DB_PORT` | `3306` | Database port |
 | `DB_USER` | `userservice` | Database username |
+| `DB_PASSWORD_FILE` | - | Path to file containing database password (for Docker secrets) |
 | `DB_PASSWORD` | `userservice` | Database password |
 | `DB_NAME` | `userservice` | Database name |
 | `JWT_SECRET_FILE` | - | Path to file containing JWT secret (for Docker secrets) |

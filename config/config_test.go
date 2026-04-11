@@ -12,6 +12,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("DB_PORT")
 	os.Unsetenv("DB_USER")
 	os.Unsetenv("DB_PASSWORD")
+	os.Unsetenv("DB_PASSWORD_FILE")
 	os.Unsetenv("DB_NAME")
 	os.Unsetenv("JWT_SECRET")
 	os.Unsetenv("JWT_SECRET_FILE")
@@ -74,6 +75,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("DB_PORT", "3307")
 	os.Setenv("DB_USER", "testuser")
 	os.Setenv("DB_PASSWORD", "testpass")
+	os.Unsetenv("DB_PASSWORD_FILE")
 	os.Setenv("DB_NAME", "testdb")
 	os.Setenv("JWT_SECRET", "test-secret-from-env")
 	os.Setenv("JWT_ISSUER", "userservice")
@@ -88,6 +90,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("DB_PORT")
 		os.Unsetenv("DB_USER")
 		os.Unsetenv("DB_PASSWORD")
+		os.Unsetenv("DB_PASSWORD_FILE")
 		os.Unsetenv("DB_NAME")
 		os.Unsetenv("JWT_SECRET")
 		os.Unsetenv("JWT_ISSUER")
@@ -153,6 +156,35 @@ func TestLoad_JWTSecretFromFile(t *testing.T) {
 
 	if cfg.JWTSecret != "secret-from-file" {
 		t.Errorf("JWTSecret = %s, want secret-from-file", cfg.JWTSecret)
+	}
+}
+
+func TestLoad_DBPasswordFromFile(t *testing.T) {
+	os.WriteFile("/tmp/test_db_password.txt", []byte("db-pass-from-file\n"), 0644)
+	defer os.Remove("/tmp/test_db_password.txt")
+
+	os.Setenv("DB_PASSWORD_FILE", "/tmp/test_db_password.txt")
+	os.Setenv("DB_PASSWORD", "db-pass-from-env")
+	defer os.Unsetenv("DB_PASSWORD_FILE")
+	defer os.Unsetenv("DB_PASSWORD")
+
+	cfg := Load()
+
+	if cfg.DBPassword != "db-pass-from-file" {
+		t.Errorf("DBPassword = %s, want db-pass-from-file", cfg.DBPassword)
+	}
+}
+
+func TestLoad_DBPasswordFileNotFoundFallsBackToEnv(t *testing.T) {
+	os.Setenv("DB_PASSWORD_FILE", "/nonexistent/db-password.txt")
+	os.Setenv("DB_PASSWORD", "db-pass-from-env")
+	defer os.Unsetenv("DB_PASSWORD_FILE")
+	defer os.Unsetenv("DB_PASSWORD")
+
+	cfg := Load()
+
+	if cfg.DBPassword != "db-pass-from-env" {
+		t.Errorf("DBPassword = %s, want db-pass-from-env", cfg.DBPassword)
 	}
 }
 

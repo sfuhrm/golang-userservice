@@ -33,14 +33,14 @@ type Config struct {
 
 // Load returns a new Config instance with values loaded from environment variables.
 // If an environment variable is not set, the default value is used.
-// JWT secret is read from a file (for Docker secrets) or falls back to env var.
+// DB password and JWT secret can be read from files (for Docker secrets) or env vars.
 func Load() *Config {
 	return &Config{
 		ServerPort:               getEnv("SERVER_PORT", "8080"),
 		DBHost:                   getEnv("DB_HOST", "mariadb"),
 		DBPort:                   getEnv("DB_PORT", "3306"),
 		DBUser:                   getEnv("DB_USER", "userservice"),
-		DBPassword:               getEnv("DB_PASSWORD", "userservice"),
+		DBPassword:               getDBPassword(),
 		DBName:                   getEnv("DB_NAME", "userservice"),
 		JWTSecret:                getJWTSecret(),
 		JWTIssuer:                getEnv("JWT_ISSUER", ""),
@@ -55,6 +55,23 @@ func Load() *Config {
 		RecoveryMailURL:          getEnv("RECOVERY_MAIL_URL", ""),
 		RecoveryMailCallback:     getEnv("RECOVERY_MAIL_CALLBACK_URL", ""),
 	}
+}
+
+// getDBPassword reads the DB password from a file or environment variable.
+// Priority: 1) DB_PASSWORD_FILE env var (path to secret file), 2) DB_PASSWORD env var, 3) default
+func getDBPassword() string {
+	if passwordFile := os.Getenv("DB_PASSWORD_FILE"); passwordFile != "" {
+		password, err := os.ReadFile(passwordFile)
+		if err == nil {
+			return strings.TrimSpace(string(password))
+		}
+	}
+
+	if password := os.Getenv("DB_PASSWORD"); password != "" {
+		return password
+	}
+
+	return "userservice"
 }
 
 // getJWTSecret reads the JWT secret from a file or environment variable.
