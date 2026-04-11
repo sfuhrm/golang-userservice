@@ -77,6 +77,7 @@ Configuration is loaded from environment variables.
 | `DB_NAME` | `userservice` | Database name |
 | `JWT_SECRET_FILE` | - | Path to file containing JWT secret (for Docker secrets) |
 | `JWT_SECRET` | `your-secret-key-change-in-production` | Secret key for signing JWT tokens (fallback) |
+| `JWT_ISSUER` | - | Optional JWT issuer claim (`iss`) for access tokens. When set, incoming access tokens must match this issuer. |
 
 ### External Mail Service Configuration (Optional)
 
@@ -128,6 +129,7 @@ The payload contains user identity and authorization data used by middleware:
 
 ```json
 {
+  "iss": "userservice",
   "sub": "550e8400-e29b-41d4-a716-446655440000",
   "roles": ["user", "admin"],
   "iat": 1712831400,
@@ -135,6 +137,7 @@ The payload contains user identity and authorization data used by middleware:
 }
 ```
 
+- `iss`: Optional issuer claim (included when `JWT_ISSUER` is configured)
 - `sub`: User UUID used to identify the authenticated user (JWT subject claim)
 - `roles`: User roles used for authorization checks (`user`, `admin`)
 - `iat`: Issued-at timestamp (Unix seconds)

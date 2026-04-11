@@ -32,6 +32,7 @@ func TestGenerateAccessToken(t *testing.T) {
 func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
 	cfg := &config.Config{
 		JWTSecret: "test-secret",
+		JWTIssuer: "userservice",
 		JWTExpire: 15 * time.Minute,
 	}
 
@@ -54,6 +55,9 @@ func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
 
 	if claims["sub"] != "user-123" {
 		t.Errorf("sub claim = %v, want user-123", claims["sub"])
+	}
+	if claims["iss"] != "userservice" {
+		t.Errorf("iss claim = %v, want userservice", claims["iss"])
 	}
 
 	if _, exists := claims["userId"]; exists {
@@ -144,6 +148,46 @@ func TestJWTAuth_InvalidToken(t *testing.T) {
 	})
 
 	err := handler(c)
+
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_InvalidIssuer(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTIssuer: "userservice",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":   "user-123",
+		"roles": []string{"user"},
+		"iss":   "different-issuer",
+		"iat":   time.Now().Unix(),
+		"exp":   time.Now().Add(15 * time.Minute).Unix(),
+	})
+	tokenString, err := token.SignedString([]byte(cfg.JWTSecret))
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenString)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err = handler(c)
 
 	if err != nil {
 		t.Errorf("JWTAuth() error = %v", err)

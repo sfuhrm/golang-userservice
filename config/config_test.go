@@ -15,6 +15,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("DB_NAME")
 	os.Unsetenv("JWT_SECRET")
 	os.Unsetenv("JWT_SECRET_FILE")
+	os.Unsetenv("JWT_ISSUER")
 	os.Unsetenv("REGISTRATION_MAIL_URL")
 	os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 	os.Unsetenv("RECOVERY_MAIL_URL")
@@ -43,6 +44,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.JWTSecret == "" {
 		t.Error("JWTSecret should not be empty")
 	}
+	if cfg.JWTIssuer != "" {
+		t.Errorf("JWTIssuer = %s, want empty", cfg.JWTIssuer)
+	}
 	if cfg.JWTExpire != 15*time.Minute {
 		t.Errorf("JWTExpire = %v, want 15m", cfg.JWTExpire)
 	}
@@ -68,6 +72,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("DB_PASSWORD", "testpass")
 	os.Setenv("DB_NAME", "testdb")
 	os.Setenv("JWT_SECRET", "test-secret-from-env")
+	os.Setenv("JWT_ISSUER", "userservice")
 	os.Setenv("REGISTRATION_MAIL_URL", "http://mail.example.com/register")
 	os.Setenv("REGISTRATION_MAIL_CALLBACK_URL", "http://example.com/verify")
 	os.Setenv("RECOVERY_MAIL_URL", "http://mail.example.com/recover")
@@ -80,6 +85,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("DB_PASSWORD")
 		os.Unsetenv("DB_NAME")
 		os.Unsetenv("JWT_SECRET")
+		os.Unsetenv("JWT_ISSUER")
 		os.Unsetenv("REGISTRATION_MAIL_URL")
 		os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 		os.Unsetenv("RECOVERY_MAIL_URL")
@@ -108,6 +114,9 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	}
 	if cfg.JWTSecret != "test-secret-from-env" {
 		t.Errorf("JWTSecret = %s, want test-secret-from-env", cfg.JWTSecret)
+	}
+	if cfg.JWTIssuer != "userservice" {
+		t.Errorf("JWTIssuer = %s, want userservice", cfg.JWTIssuer)
 	}
 	if cfg.RegistrationMailURL != "http://mail.example.com/register" {
 		t.Errorf("RegistrationMailURL = %s, want http://mail.example.com/register", cfg.RegistrationMailURL)

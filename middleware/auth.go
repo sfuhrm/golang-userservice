@@ -108,9 +108,14 @@ func JWTAuth(cfg *config.Config) echo.MiddlewareFunc {
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 			claims := &JWTClaims{}
+			parseOptions := []jwt.ParserOption{}
+			if cfg.JWTIssuer != "" {
+				parseOptions = append(parseOptions, jwt.WithIssuer(cfg.JWTIssuer))
+			}
+
 			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 				return []byte(cfg.JWTSecret), nil
-			})
+			}, parseOptions...)
 
 			if err != nil || !token.Valid {
 				return c.JSON(http.StatusUnauthorized, models.ErrorResponse{
@@ -165,6 +170,7 @@ func GenerateAccessToken(userID string, roles []models.UserRole, cfg *config.Con
 		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
+			Issuer:    cfg.JWTIssuer,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.JWTExpire)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
