@@ -354,6 +354,7 @@ func TestLogin_Success(t *testing.T) {
 		AddRow("user-123", "testuser", "test@example.com", passwordHash, true, false, time.Now(), time.Now())
 	mock.ExpectQuery("SELECT id, username, email, password_hash").WithArgs("test@example.com").WillReturnRows(rows)
 	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
+	mock.ExpectQuery("SELECT NEXT VALUE FOR jwt_jti_seq").WillReturnRows(sqlmock.NewRows([]string{"next_value"}).AddRow(1))
 	mock.ExpectExec("INSERT INTO refresh_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery("SELECT id, username, email, email_verified, created_at, updated_at FROM users WHERE id = ?").
 		WithArgs("user-123").
@@ -499,6 +500,7 @@ func TestRefresh_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT disabled FROM users").WillReturnRows(sqlmock.NewRows([]string{"disabled"}).AddRow(false))
 	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
 	mock.ExpectExec("DELETE FROM refresh_tokens").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT NEXT VALUE FOR jwt_jti_seq").WillReturnRows(sqlmock.NewRows([]string{"next_value"}).AddRow(2))
 	mock.ExpectExec("INSERT INTO refresh_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectQuery("SELECT id, username, email, email_verified, created_at, updated_at FROM users WHERE id = ?").
 		WithArgs("user-123").

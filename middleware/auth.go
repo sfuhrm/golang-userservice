@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"userservice/config"
 	"userservice/models"
@@ -169,10 +170,16 @@ func RequireRole(requiredRole models.UserRole) echo.MiddlewareFunc {
 // GenerateAccessToken creates a new JWT access token for the given user.
 // The token contains the user ID, roles, and expires according to configuration.
 func GenerateAccessToken(userID string, roles []models.UserRole, cfg *config.Config) (string, error) {
+	return GenerateAccessTokenWithJTI(userID, roles, uuid.NewString(), cfg)
+}
+
+// GenerateAccessTokenWithJTI creates a new JWT access token with an explicit JWT ID (jti).
+func GenerateAccessTokenWithJTI(userID string, roles []models.UserRole, jti string, cfg *config.Config) (string, error) {
 	claims := &JWTClaims{
 		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
+			ID:        jti,
 			Issuer:    cfg.JWTIssuer,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.JWTExpire)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

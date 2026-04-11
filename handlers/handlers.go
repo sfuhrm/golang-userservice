@@ -62,6 +62,15 @@ func (h *Handler) getUserRoles(userID string) ([]models.UserRole, error) {
 	return roles, nil
 }
 
+// nextJWTID returns the next unique JWT ID (jti) from the database sequence.
+func (h *Handler) nextJWTID() (string, error) {
+	var nextVal int64
+	if err := h.db.QueryRow("SELECT NEXT VALUE FOR jwt_jti_seq").Scan(&nextVal); err != nil {
+		return "", err
+	}
+	return strconv.FormatInt(nextVal, 10), nil
+}
+
 // sendRegistrationMail sends a registration verification email via external service.
 func (h *Handler) sendRegistrationMail(username, email, token string) error {
 	reqBody := models.RegistrationMailRequest{
@@ -867,7 +876,15 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 // generateTokens creates a new access/refresh token pair for the given user.
 // Stores the refresh token in the database for later validation.
 func (h *Handler) generateTokens(c echo.Context, userID string, roles []models.UserRole) error {
-	accessToken, err := middleware.GenerateAccessToken(userID, roles, h.cfg)
+	jti, err := h.nextJWTID()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Code:    "INTERNAL_ERROR",
+			Message: "Failed to generate token ID",
+		})
+	}
+
+	accessToken, err := middleware.GenerateAccessTokenWithJTI(userID, roles, jti, h.cfg)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "INTERNAL_ERROR",

@@ -57,6 +57,9 @@ func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
 	if claims["sub"] != "user-123" {
 		t.Errorf("sub claim = %v, want user-123", claims["sub"])
 	}
+	if claims["jti"] == "" {
+		t.Error("jti claim should be present and non-empty")
+	}
 	if claims["iss"] != "userservice" {
 		t.Errorf("iss claim = %v, want userservice", claims["iss"])
 	}
@@ -75,6 +78,34 @@ func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
 
 	if _, exists := claims["userId"]; exists {
 		t.Error("userId claim should not be present")
+	}
+}
+
+func TestGenerateAccessTokenWithJTI_UsesProvidedJTI(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token, err := GenerateAccessTokenWithJTI("user-123", []models.UserRole{models.RoleUser}, "42", cfg)
+	if err != nil {
+		t.Fatalf("GenerateAccessTokenWithJTI() error = %v", err)
+	}
+
+	parsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(cfg.JWTSecret), nil
+	})
+	if err != nil {
+		t.Fatalf("jwt.Parse() error = %v", err)
+	}
+
+	claims, ok := parsed.Claims.(jwt.MapClaims)
+	if !ok {
+		t.Fatalf("claims type = %T, want jwt.MapClaims", parsed.Claims)
+	}
+
+	if claims["jti"] != "42" {
+		t.Errorf("jti claim = %v, want 42", claims["jti"])
 	}
 }
 

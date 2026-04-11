@@ -132,6 +132,7 @@ The payload contains user identity and authorization data used by middleware:
 {
   "aud": "userservice-api",
   "iss": "userservice",
+  "jti": "12345",
   "sub": "550e8400-e29b-41d4-a716-446655440000",
   "roles": ["user", "admin"],
   "iat": 1712831400,
@@ -141,6 +142,7 @@ The payload contains user identity and authorization data used by middleware:
 
 - `aud`: Optional audience claim (included when `JWT_AUDIENCE` is configured)
 - `iss`: Optional issuer claim (included when `JWT_ISSUER` is configured)
+- `jti`: Unique token ID (JWT ID claim). Generated per token from MariaDB sequence `jwt_jti_seq`.
 - `sub`: User UUID used to identify the authenticated user (JWT subject claim)
 - `roles`: User roles used for authorization checks (`user`, `admin`)
 - `iat`: Issued-at timestamp (Unix seconds)
