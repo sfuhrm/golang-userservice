@@ -100,6 +100,58 @@ These are compiled-in defaults and cannot be changed via environment variables:
 | Standard Rate Limit | 100 requests / 15 min | Per IP address |
 | Auth Rate Limit | 5 requests / 15 min | Per IP address (login, register, password-recovery) |
 
+### JWT Access Token Components
+
+The `accessToken` returned by `/v1/auth/login` and `/v1/auth/refresh` is a JWT with this format:
+
+`<base64url(header)>.<base64url(payload)>.<base64url(signature)>`
+
+JWT content is signed, not encrypted. Anyone who has the token can decode header/payload, but cannot forge a valid signature without the server secret.
+
+**1) Header**
+
+The header defines how the token is signed:
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+- `alg`: Signing algorithm (`HS256`, HMAC-SHA256 in this service)
+- `typ`: Token type (`JWT`)
+
+**2) Payload (claims)**
+
+The payload contains user identity and authorization data used by middleware:
+
+```json
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "roles": ["user", "admin"],
+  "iat": 1712831400,
+  "exp": 1712832300
+}
+```
+
+- `userId`: User UUID used to identify the authenticated user
+- `roles`: User roles used for authorization checks (`user`, `admin`)
+- `iat`: Issued-at timestamp (Unix seconds)
+- `exp`: Expiration timestamp (Unix seconds, default +15 minutes)
+
+**3) Signature**
+
+The signature protects integrity:
+
+`HMACSHA256(base64url(header) + "." + base64url(payload), JWT_SECRET)`
+
+If header or payload is modified, signature validation fails and the API returns `401`.
+
+**Refresh Token Note**
+
+`refreshToken` is not a JWT in this service. It is an opaque UUID value stored server-side in `refresh_tokens` and rotated on every successful `/v1/auth/refresh`.
+
 ## API Endpoints
 
 ### Authentication
