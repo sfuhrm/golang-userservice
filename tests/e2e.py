@@ -102,6 +102,30 @@ def promote_to_admin(user_id):
         fail(f"Failed to promote user to admin via database command: {stderr}")
 
 
+def insert_verification_token(user_id, token_type, token):
+    sql = (
+        f"INSERT INTO verification_tokens (id, user_id, token, type, expires_at, created_at) "
+        f"VALUES (UUID(), '{user_id}', '{token}', '{token_type}', DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW());"
+    )
+    cmd = [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "mariadb",
+        "mariadb",
+        "-uuserservice",
+        "-puserservice",
+        "userservice",
+        "-e",
+        sql,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or "no stderr"
+        fail(f"Failed to insert verification token via database command: {stderr}")
+
+
 def test_e2e():
     print("Waiting for service to be ready...")
     if not wait_for_service(BASE_URL):
@@ -219,6 +243,119 @@ def test_e2e():
     print("Testing login after deletion...")
     login_user(user, expected_status=401)
     print("Verified account deleted (login fails)")
+
+    print("\n=== Testing Registration and Password Reset Endpoints ===")
+
+    print("Testing registration validation - invalid username...")
+    response = requests.post(
+        f"{BASE_URL}/users",
+        json={"username": "ab", "email": "test@example.com", "password": "SecurePass123!"},
+        timeout=10,
+    )
+    expect_status(response, 400, "Registration with short username")
+    print("Verified registration rejects short username")
+
+    print("Testing registration validation - invalid email...")
+    response = requests.post(
+        f"{BASE_URL}/users",
+        json={"username": "validuser", "email": "not-an-email", "password": "SecurePass123!"},
+        timeout=10,
+    )
+    expect_status(response, 400, "Registration with invalid email")
+    print("Verified registration rejects invalid email")
+
+    print("Testing registration validation - weak password...")
+    response = requests.post(
+        f"{BASE_URL}/users",
+        json={"username": "validuser2", "email": "test2@example.com", "password": "short"},
+        timeout=10,
+    )
+    expect_status(response, 400, "Registration with weak password")
+    print("Verified registration rejects weak password")
+
+    print("Testing registration with duplicate username...")
+    dupe_user = make_user("dupe_test")
+    requests.post(
+        f"{BASE_URL}/users",
+        json={"username": dupe_user[0], "email": dupe_user[1], "password": dupe_user[2]},
+        timeout=10,
+    )
+    response = requests.post(
+        f"{BASE_URL}/users",
+        json={"username": dupe_user[0], "email": "different@example.com", "password": dupe_user[2]},
+        timeout=10,
+    )
+    expect_status(response, 409, "Registration with duplicate username")
+    print("Verified registration rejects duplicate username")
+
+    print("Testing password recovery when not configured...")
+    response = requests.post(
+        f"{BASE_URL}/auth/password-recovery",
+        json={"email": "nonexistent@example.com"},
+        timeout=10,
+    )
+    expect_status(response, 501, "Password recovery not configured")
+    print("Verified password recovery returns 501 when not configured")
+
+    print("Testing password recovery with valid email...")
+    recovery_user = register_user("recovery_test")
+    response = requests.post(
+        f"{BASE_URL}/auth/password-recovery",
+        json={"email": recovery_user["email"]},
+        timeout=10,
+    )
+    if response.status_code == 501:
+        print("Skipping password recovery test - mail service not configured")
+    else:
+        expect_status(response, 202, "Password recovery request")
+        print("Verified password recovery returns 202 for valid email")
+
+    print("Testing reset password with invalid token...")
+    response = requests.post(
+        f"{BASE_URL}/auth/reset-password",
+        json={"token": "invalid-token-12345", "newPassword": "NewPassword123!"},
+        timeout=10,
+    )
+    expect_status(response, 400, "Reset password with invalid token")
+    print("Verified reset password rejects invalid token")
+
+    print("Testing reset password with valid token...")
+    recovery_user2 = register_user("recovery_test2")
+    token = uuid.uuid4().hex
+    insert_verification_token(recovery_user2["id"], "recovery", token)
+    response = requests.post(
+        f"{BASE_URL}/auth/reset-password",
+        json={"token": token, "newPassword": "NewSecurePass456!"},
+        timeout=10,
+    )
+    expect_status(response, 200, "Reset password with valid token")
+    print("Verified reset password succeeds with valid token")
+
+    print("Testing login with new password after reset...")
+    recovery_user2["password"] = "NewSecurePass456!"
+    login_user(recovery_user2)
+    print("Verified login works with new password after reset")
+
+    print("Testing verify registration endpoint with invalid token...")
+    response = requests.post(
+        f"{BASE_URL}/auth/verify-registration",
+        json={"token": "invalid-registration-token"},
+        timeout=10,
+    )
+    expect_status(response, 400, "Verify registration with invalid token")
+    print("Verified verify registration rejects invalid token")
+
+    print("Testing verify registration endpoint with valid token...")
+    verify_user = register_user("verify_test")
+    verify_token = uuid.uuid4().hex
+    insert_verification_token(verify_user["id"], "registration", verify_token)
+    response = requests.post(
+        f"{BASE_URL}/auth/verify-registration",
+        json={"token": verify_token},
+        timeout=10,
+    )
+    expect_status(response, 200, "Verify registration with valid token")
+    print("Verified verify registration succeeds with valid token")
 
     print("\n=== ALL TESTS PASSED ===")
 
