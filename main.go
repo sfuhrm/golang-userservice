@@ -58,6 +58,10 @@ func main() {
 	coverageTracker := middleware.NewCoverageTracker()
 	e.Use(coverageTracker.Middleware())
 
+	h := handlers.New(db, cfg)
+
+	e.GET("/q/health/live", h.Live)
+
 	e.GET("/debug/coverage", func(c echo.Context) error {
 		coverage := middleware.CalculateCoverage()
 		coveredRoutes := middleware.GetCoveredRoutes()
@@ -68,8 +72,6 @@ func main() {
 			"total_routes":   allRoutes,
 		})
 	})
-
-	h := handlers.New(db, cfg)
 
 	api := e.Group("/v1")
 
