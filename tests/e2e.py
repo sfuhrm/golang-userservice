@@ -4,6 +4,8 @@ import time
 import os
 import subprocess
 import uuid
+import base64
+import json
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8080/v1")
 
@@ -39,6 +41,64 @@ def with_test_ip(headers=None):
     if "X-Forwarded-For" not in merged:
         merged["X-Forwarded-For"] = f"198.51.100.{(uuid.uuid4().int % 250) + 1}"
     return merged
+
+
+def decode_jwt_claims(token):
+    parts = token.split(".")
+    if len(parts) != 3:
+        fail("Access token is not a valid JWT format")
+
+    payload = parts[1]
+    padding = "=" * (-len(payload) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(payload + padding)
+        claims = json.loads(decoded.decode("utf-8"))
+    except Exception as exc:
+        fail(f"Failed to decode JWT payload: {exc}")
+    return claims
+
+
+def assert_jwt_claims(access_token, expected_sub, required_roles):
+    claims = decode_jwt_claims(access_token)
+
+    if claims.get("sub") != expected_sub:
+        fail(f"JWT sub mismatch: {claims.get('sub')} != {expected_sub}")
+
+    roles = claims.get("roles")
+    if not isinstance(roles, list):
+        fail(f"JWT roles claim must be a list, got: {type(roles).__name__}")
+    for role in required_roles:
+        if role not in roles:
+            fail(f"JWT roles claim missing required role '{role}': {roles}")
+
+    jti = claims.get("jti")
+    if not isinstance(jti, str) or not jti.strip():
+        fail(f"JWT jti claim must be a non-empty string, got: {jti}")
+
+    iat = claims.get("iat")
+    exp = claims.get("exp")
+    if not isinstance(iat, (int, float)) or not isinstance(exp, (int, float)):
+        fail(f"JWT iat/exp must be numeric, got iat={iat} exp={exp}")
+    if int(exp) <= int(iat):
+        fail(f"JWT exp must be greater than iat, got iat={iat} exp={exp}")
+
+    expected_issuer = os.getenv("JWT_ISSUER")
+    if expected_issuer and claims.get("iss") != expected_issuer:
+        fail(f"JWT iss mismatch: {claims.get('iss')} != {expected_issuer}")
+
+    expected_audience = os.getenv("JWT_AUDIENCE")
+    if expected_audience:
+        aud = claims.get("aud")
+        if isinstance(aud, str):
+            if aud != expected_audience:
+                fail(f"JWT aud mismatch: {aud} != {expected_audience}")
+        elif isinstance(aud, list):
+            if expected_audience not in aud:
+                fail(f"JWT aud list missing expected audience '{expected_audience}': {aud}")
+        else:
+            fail(f"JWT aud claim has unexpected type: {type(aud).__name__}")
+
+    return claims
 
 
 def make_user(label):
@@ -147,6 +207,13 @@ def test_e2e():
     admin = register_user("e2e_admin")
     promote_to_admin(admin["id"])
     admin_headers = login_user(admin)
+
+    print("Testing JWT field validation for login tokens...")
+    user_claims = assert_jwt_claims(user_headers["Authorization"][7:], user["id"], ["user"])
+    admin_claims = assert_jwt_claims(admin_headers["Authorization"][7:], admin["id"], ["admin"])
+    if user_claims.get("jti") == admin_claims.get("jti"):
+        fail("JWT jti should be unique per token but duplicate jti was found")
+    print("Verified JWT fields for user/admin login tokens")
 
     print("Testing admin endpoint access control...")
     response = requests.get(f"{BASE_URL}/admin/users", headers=user_headers, timeout=10)
