@@ -128,14 +128,14 @@ The payload contains user identity and authorization data used by middleware:
 
 ```json
 {
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "sub": "550e8400-e29b-41d4-a716-446655440000",
   "roles": ["user", "admin"],
   "iat": 1712831400,
   "exp": 1712832300
 }
 ```
 
-- `userId`: User UUID used to identify the authenticated user
+- `sub`: User UUID used to identify the authenticated user (JWT subject claim)
 - `roles`: User roles used for authorization checks (`user`, `admin`)
 - `iat`: Issued-at timestamp (Unix seconds)
 - `exp`: Expiration timestamp (Unix seconds, default +15 minutes)

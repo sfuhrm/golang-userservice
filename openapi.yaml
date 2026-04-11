@@ -19,7 +19,7 @@ info:
       * `alg`: `HS256` (HMAC-SHA256)
       * `typ`: `JWT`
     * **Payload Claims**:
-      * `userId`: Authenticated user UUID
+      * `sub`: Authenticated user UUID (subject claim)
       * `roles`: Array of user roles (`user`, `admin`)
       * `iat`: Issued-at time (Unix timestamp seconds)
       * `exp`: Expiration time (Unix timestamp seconds)
@@ -1150,12 +1150,12 @@ components:
 
     JWTAccessTokenClaims:
       type: object
-      required: [userId, roles, iat, exp]
+      required: [sub, roles, iat, exp]
       description: Decoded JWT payload claims used by this service for access tokens.
       properties:
-        userId:
+        sub:
           $ref: '#/components/schemas/UUID'
-          description: Authenticated user ID.
+          description: Authenticated user ID (JWT subject claim).
         roles:
           type: array
           description: Roles granted to the authenticated user.
@@ -1174,7 +1174,7 @@ components:
           description: Expiration time as Unix timestamp (seconds).
           example: 1705315500
       example:
-        userId: 550e8400-e29b-41d4-a716-446655440000
+        sub: 550e8400-e29b-41d4-a716-446655440000
         roles: [user, admin]
         iat: 1705314600
         exp: 1705315500
@@ -1187,7 +1187,7 @@ components:
           description: |
             Signed JWT access token in the format `<base64url(header)>.<base64url(payload)>.<base64url(signature)>`.
             Header fields: `alg`, `typ`.
-            Payload claims: `userId`, `roles`, `iat`, `exp`.
+            Payload claims: `sub`, `roles`, `iat`, `exp`.
           example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         refreshToken:
           type: string

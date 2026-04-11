@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"userservice/config"
 	"userservice/models"
@@ -25,6 +26,38 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	if token == "" {
 		t.Error("GenerateAccessToken() should return a non-empty token")
+	}
+}
+
+func TestGenerateAccessToken_UsesSubClaim(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+
+	parsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(cfg.JWTSecret), nil
+	})
+	if err != nil {
+		t.Fatalf("jwt.Parse() error = %v", err)
+	}
+
+	claims, ok := parsed.Claims.(jwt.MapClaims)
+	if !ok {
+		t.Fatalf("claims type = %T, want jwt.MapClaims", parsed.Claims)
+	}
+
+	if claims["sub"] != "user-123" {
+		t.Errorf("sub claim = %v, want user-123", claims["sub"])
+	}
+
+	if _, exists := claims["userId"]; exists {
+		t.Error("userId claim should not be present")
 	}
 }
 
@@ -112,6 +145,42 @@ func TestJWTAuth_InvalidToken(t *testing.T) {
 
 	err := handler(c)
 
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_MissingSubject(t *testing.T) {
+	cfg := &config.Config{
+		JWTSecret: "test-secret",
+		JWTExpire: 15 * time.Minute,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"roles": []string{"user"},
+		"iat":   time.Now().Unix(),
+		"exp":   time.Now().Add(15 * time.Minute).Unix(),
+	})
+	tokenString, err := token.SignedString([]byte(cfg.JWTSecret))
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenString)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		return c.String(http.StatusOK, "success")
+	})
+
+	err = handler(c)
 	if err != nil {
 		t.Errorf("JWTAuth() error = %v", err)
 	}

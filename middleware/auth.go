@@ -15,10 +15,9 @@ import (
 )
 
 // JWTClaims represents the claims stored in a JWT access token.
-// Includes the user ID and roles extracted from the token.
+// Includes the standard subject claim (sub) and user roles extracted from the token.
 type JWTClaims struct {
-	UserID string            `json:"userId"` // User identifier from the token
-	Roles  []models.UserRole `json:"roles"`  // User roles from the token
+	Roles []models.UserRole `json:"roles"` // User roles from the token
 	jwt.RegisteredClaims
 }
 
@@ -119,8 +118,14 @@ func JWTAuth(cfg *config.Config) echo.MiddlewareFunc {
 					Message: "Invalid or expired token",
 				})
 			}
+			if claims.Subject == "" {
+				return c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+					Code:    "UNAUTHORIZED",
+					Message: "Invalid token subject",
+				})
+			}
 
-			c.Set("userID", claims.UserID)
+			c.Set("userID", claims.Subject)
 			c.Set("roles", claims.Roles)
 			return next(c)
 		}
@@ -157,9 +162,9 @@ func RequireRole(requiredRole models.UserRole) echo.MiddlewareFunc {
 // The token contains the user ID, roles, and expires according to configuration.
 func GenerateAccessToken(userID string, roles []models.UserRole, cfg *config.Config) (string, error) {
 	claims := &JWTClaims{
-		UserID: userID,
-		Roles:  roles,
+		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(cfg.JWTExpire)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
