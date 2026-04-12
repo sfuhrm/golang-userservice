@@ -4,6 +4,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -47,9 +48,9 @@ func Load() *Config {
 		JWTAudience:              getEnv("JWT_AUDIENCE", ""),
 		JWTExpire:                15 * time.Minute,
 		RefreshExpire:            7 * 24 * time.Hour,
-		RateLimit:                100,
-		RateLimitWindow:          15 * time.Minute,
-		AuthRateLimit:            5,
+		RateLimit:                getEnvInt("RATE_LIMIT", 100),
+		RateLimitWindow:          getEnvDuration("RATE_LIMIT_WINDOW", 15*time.Minute),
+		AuthRateLimit:            getEnvInt("AUTH_RATE_LIMIT", 5),
 		RegistrationMailURL:      getEnv("REGISTRATION_MAIL_URL", ""),
 		RegistrationMailCallback: getEnv("REGISTRATION_MAIL_CALLBACK_URL", ""),
 		RecoveryMailURL:          getEnv("RECOVERY_MAIL_URL", ""),
@@ -97,4 +98,32 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvInt retrieves an integer environment variable or returns a default when unset/invalid.
+func getEnvInt(key string, defaultValue int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return defaultValue
+	}
+	return parsed
+}
+
+// getEnvDuration retrieves a Go duration environment variable or returns a default when unset/invalid.
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return defaultValue
+	}
+	return parsed
 }

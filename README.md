@@ -80,6 +80,9 @@ Configuration is loaded from environment variables.
 | `JWT_SECRET` | `your-secret-key-change-in-production` | Secret key for signing JWT tokens (fallback) |
 | `JWT_ISSUER` | - | Optional JWT issuer claim (`iss`) for access tokens. When set, incoming access tokens must match this issuer. |
 | `JWT_AUDIENCE` | - | Optional JWT audience claim (`aud`) for access tokens. When set, incoming access tokens must include this audience. |
+| `RATE_LIMIT` | `100` | Standard rate limit requests per window (per IP) |
+| `AUTH_RATE_LIMIT` | `5` | Auth endpoint rate limit requests per window (per IP) |
+| `RATE_LIMIT_WINDOW` | `15m` | Rate-limit window duration (Go duration, e.g. `1m`, `15m`, `1h`) |
 
 ### External Mail Service Configuration (Optional)
 
@@ -92,16 +95,17 @@ When configured, the service integrates with external mail services for sending 
 | `RECOVERY_MAIL_URL` | - | External URL for sending password recovery emails. If not set, returns HTTP 501. |
 | `RECOVERY_MAIL_CALLBACK_URL` | - | Callback URL for password recovery verification (included in mail request) |
 
-### Token Configuration
+### Token and Rate Limit Configuration
 
-These are compiled-in defaults and cannot be changed via environment variables:
+Token expiry values are compiled-in defaults.
+Rate limits are configurable via environment variables (`RATE_LIMIT`, `AUTH_RATE_LIMIT`, `RATE_LIMIT_WINDOW`).
 
 | Setting | Value | Description |
 |---------|-------|-------------|
 | JWT Expiry | 15 minutes | Access token lifetime |
 | Refresh Token Expiry | 7 days | Refresh token lifetime |
-| Standard Rate Limit | 100 requests / 15 min | Per IP address |
-| Auth Rate Limit | 5 requests / 15 min | Per IP address (login, register, password-recovery) |
+| Standard Rate Limit (default) | 100 requests / 15 min | Per IP address |
+| Auth Rate Limit (default) | 5 requests / 15 min | Per IP address (login, refresh, password-recovery) |
 
 ### JWT Access Token Components
 

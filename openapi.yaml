@@ -8,8 +8,9 @@ info:
     ### Global Policies
     * **CORS**: Allowed for `https://*.example.com`, `http://localhost:8081`, and `http://127.0.0.1:8081`. Preflight requests (OPTIONS) are supported.
     * **Rate Limiting**: 
-      * Standard: 100 requests / 15 min per IP.
-      * Auth Endpoints (`/login`, `/register`, `/password-recovery`): 5 attempts / 15 min per IP.
+      * Standard default: 100 requests / 15 min per IP.
+      * Auth endpoints default (`/login`, `/refresh`, `/password-recovery`): 5 attempts / 15 min per IP.
+      * Configurable via env: `RATE_LIMIT`, `AUTH_RATE_LIMIT`, `RATE_LIMIT_WINDOW`.
     * **Authentication**: JWT-based via Bearer Token.
 
     ### JWT Access Token Components
