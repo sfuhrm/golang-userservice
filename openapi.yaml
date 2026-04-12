@@ -9,8 +9,9 @@ info:
     * **CORS**: Allowed for `https://*.example.com`, `http://localhost:8081`, and `http://127.0.0.1:8081`. Preflight requests (OPTIONS) are supported.
     * **Rate Limiting**: 
       * Standard default: 100 requests / 15 min per IP.
-      * Auth endpoints default (`/login`, `/refresh`, `/password-recovery`): 5 attempts / 15 min per IP.
-      * Configurable via env: `RATE_LIMIT`, `AUTH_RATE_LIMIT`, `RATE_LIMIT_WINDOW`.
+      * Auth endpoints default (`/login`, `/password-recovery`): 5 attempts / 15 min per IP.
+      * Refresh endpoint default (`/refresh`): 30 attempts / 15 min per IP.
+      * Configurable via env: `RATE_LIMIT`, `AUTH_RATE_LIMIT`, `REFRESH_RATE_LIMIT`, `RATE_LIMIT_WINDOW`.
     * **Authentication**: JWT-based via Bearer Token.
 
     ### JWT Access Token Components
@@ -248,6 +249,8 @@ paths:
               example:
                 code: ACCOUNT_DISABLED
                 message: Account is disabled
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /v1/auth/logout:
     post:

@@ -21,6 +21,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("RATE_LIMIT")
 	os.Unsetenv("RATE_LIMIT_WINDOW")
 	os.Unsetenv("AUTH_RATE_LIMIT")
+	os.Unsetenv("REFRESH_RATE_LIMIT")
 	os.Unsetenv("REGISTRATION_MAIL_URL")
 	os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 	os.Unsetenv("RECOVERY_MAIL_URL")
@@ -70,6 +71,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.AuthRateLimit != 5 {
 		t.Errorf("AuthRateLimit = %d, want 5", cfg.AuthRateLimit)
 	}
+	if cfg.RefreshRateLimit != 30 {
+		t.Errorf("RefreshRateLimit = %d, want 30", cfg.RefreshRateLimit)
+	}
 }
 
 func TestLoad_FromEnvironment(t *testing.T) {
@@ -86,6 +90,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("RATE_LIMIT", "250")
 	os.Setenv("RATE_LIMIT_WINDOW", "30m")
 	os.Setenv("AUTH_RATE_LIMIT", "25")
+	os.Setenv("REFRESH_RATE_LIMIT", "80")
 	os.Setenv("REGISTRATION_MAIL_URL", "http://mail.example.com/register")
 	os.Setenv("REGISTRATION_MAIL_CALLBACK_URL", "http://example.com/verify")
 	os.Setenv("RECOVERY_MAIL_URL", "http://mail.example.com/recover")
@@ -104,6 +109,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("RATE_LIMIT")
 		os.Unsetenv("RATE_LIMIT_WINDOW")
 		os.Unsetenv("AUTH_RATE_LIMIT")
+		os.Unsetenv("REFRESH_RATE_LIMIT")
 		os.Unsetenv("REGISTRATION_MAIL_URL")
 		os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 		os.Unsetenv("RECOVERY_MAIL_URL")
@@ -147,6 +153,9 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	}
 	if cfg.AuthRateLimit != 25 {
 		t.Errorf("AuthRateLimit = %d, want 25", cfg.AuthRateLimit)
+	}
+	if cfg.RefreshRateLimit != 80 {
+		t.Errorf("RefreshRateLimit = %d, want 80", cfg.RefreshRateLimit)
 	}
 	if cfg.RegistrationMailURL != "http://mail.example.com/register" {
 		t.Errorf("RegistrationMailURL = %s, want http://mail.example.com/register", cfg.RegistrationMailURL)
@@ -224,9 +233,11 @@ func TestLoad_JWTSecretFileNotFound(t *testing.T) {
 func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	os.Setenv("RATE_LIMIT", "not-an-int")
 	os.Setenv("AUTH_RATE_LIMIT", "-3")
+	os.Setenv("REFRESH_RATE_LIMIT", "invalid")
 	os.Setenv("RATE_LIMIT_WINDOW", "not-a-duration")
 	defer os.Unsetenv("RATE_LIMIT")
 	defer os.Unsetenv("AUTH_RATE_LIMIT")
+	defer os.Unsetenv("REFRESH_RATE_LIMIT")
 	defer os.Unsetenv("RATE_LIMIT_WINDOW")
 
 	cfg := Load()
@@ -236,6 +247,9 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	}
 	if cfg.AuthRateLimit != 5 {
 		t.Errorf("AuthRateLimit = %d, want default 5", cfg.AuthRateLimit)
+	}
+	if cfg.RefreshRateLimit != 30 {
+		t.Errorf("RefreshRateLimit = %d, want default 30", cfg.RefreshRateLimit)
 	}
 	if cfg.RateLimitWindow != 15*time.Minute {
 		t.Errorf("RateLimitWindow = %v, want default 15m", cfg.RateLimitWindow)

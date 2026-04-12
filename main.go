@@ -52,6 +52,7 @@ func main() {
 
 	standardLimiter := middleware.NewRateLimiter(cfg.RateLimit, cfg.RateLimitWindow)
 	authLimiter := middleware.NewRateLimiter(cfg.AuthRateLimit, cfg.RateLimitWindow)
+	refreshLimiter := middleware.NewRateLimiter(cfg.RefreshRateLimit, cfg.RateLimitWindow)
 
 	e.Use(standardLimiter.Middleware())
 
@@ -77,7 +78,7 @@ func main() {
 
 	apiAuth := api.Group("/auth")
 	apiAuth.POST("/login", h.Login, authLimiter.Middleware())
-	apiAuth.POST("/refresh", h.Refresh, authLimiter.Middleware())
+	apiAuth.POST("/refresh", h.Refresh, refreshLimiter.Middleware())
 	apiAuth.POST("/logout", h.Logout, middleware.JWTAuth(cfg))
 	apiAuth.POST("/password-recovery", h.PasswordRecovery, authLimiter.Middleware())
 	apiAuth.POST("/verify-registration", h.VerifyRegistration)

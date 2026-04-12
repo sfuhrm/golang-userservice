@@ -26,6 +26,7 @@ type Config struct {
 	RateLimit                int           // Standard rate limit requests per window (default: 100)
 	RateLimitWindow          time.Duration // Rate limit time window (default: 15 minutes)
 	AuthRateLimit            int           // Auth endpoints rate limit (default: 5)
+	RefreshRateLimit         int           // Refresh endpoint rate limit (default: 30)
 	RegistrationMailURL      string        // Optional external URL for registration mail service
 	RegistrationMailCallback string        // Callback URL for registration email verification
 	RecoveryMailURL          string        // Optional external URL for recovery mail service
@@ -51,6 +52,7 @@ func Load() *Config {
 		RateLimit:                getEnvInt("RATE_LIMIT", 100),
 		RateLimitWindow:          getEnvDuration("RATE_LIMIT_WINDOW", 15*time.Minute),
 		AuthRateLimit:            getEnvInt("AUTH_RATE_LIMIT", 5),
+		RefreshRateLimit:         getEnvInt("REFRESH_RATE_LIMIT", 30),
 		RegistrationMailURL:      getEnv("REGISTRATION_MAIL_URL", ""),
 		RegistrationMailCallback: getEnv("REGISTRATION_MAIL_CALLBACK_URL", ""),
 		RecoveryMailURL:          getEnv("RECOVERY_MAIL_URL", ""),

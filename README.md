@@ -82,6 +82,7 @@ Configuration is loaded from environment variables.
 | `JWT_AUDIENCE` | - | Optional JWT audience claim (`aud`) for access tokens. When set, incoming access tokens must include this audience. |
 | `RATE_LIMIT` | `100` | Standard rate limit requests per window (per IP) |
 | `AUTH_RATE_LIMIT` | `5` | Auth endpoint rate limit requests per window (per IP) |
+| `REFRESH_RATE_LIMIT` | `30` | Refresh endpoint rate limit requests per window (per IP) |
 | `RATE_LIMIT_WINDOW` | `15m` | Rate-limit window duration (Go duration, e.g. `1m`, `15m`, `1h`) |
 
 ### External Mail Service Configuration (Optional)
@@ -98,14 +99,15 @@ When configured, the service integrates with external mail services for sending 
 ### Token and Rate Limit Configuration
 
 Token expiry values are compiled-in defaults.
-Rate limits are configurable via environment variables (`RATE_LIMIT`, `AUTH_RATE_LIMIT`, `RATE_LIMIT_WINDOW`).
+Rate limits are configurable via environment variables (`RATE_LIMIT`, `AUTH_RATE_LIMIT`, `REFRESH_RATE_LIMIT`, `RATE_LIMIT_WINDOW`).
 
 | Setting | Value | Description |
 |---------|-------|-------------|
 | JWT Expiry | 15 minutes | Access token lifetime |
 | Refresh Token Expiry | 7 days | Refresh token lifetime |
 | Standard Rate Limit (default) | 100 requests / 15 min | Per IP address |
-| Auth Rate Limit (default) | 5 requests / 15 min | Per IP address (login, refresh, password-recovery) |
+| Auth Rate Limit (default) | 5 requests / 15 min | Per IP address (login, password-recovery) |
+| Refresh Rate Limit (default) | 30 requests / 15 min | Per IP address (`/v1/auth/refresh`) |
 
 ### JWT Access Token Components
 
@@ -172,7 +174,7 @@ If header or payload is modified, signature validation fails and the API returns
 | Method | Endpoint | Auth | Rate Limited | Description |
 |--------|----------|------|-------------|-------------|
 | POST | `/v1/auth/login` | No | Yes (auth) | User login |
-| POST | `/v1/auth/refresh` | No | Yes (auth) | Refresh access token |
+| POST | `/v1/auth/refresh` | No | Yes (refresh) | Refresh access token |
 | POST | `/v1/auth/logout` | Yes | Yes | Invalidate refresh token |
 | POST | `/v1/auth/password-recovery` | No | Yes (auth) | Initiate password reset (requires mail service) |
 | POST | `/v1/auth/verify-registration` | No | No | Verify email registration |
