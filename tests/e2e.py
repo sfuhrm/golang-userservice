@@ -35,6 +35,20 @@ def expect_status(response, expected, context):
     if response.status_code != expected:
         fail(f"{context} returned {response.status_code}: {response.text}")
 
+def expect_retry_after_header(response, context):
+    retry_after = response.headers.get("Retry-After")
+    if not retry_after:
+        fail(f"{context} did not return Retry-After header")
+
+    try:
+        retry_after_seconds = int(retry_after)
+    except ValueError:
+        fail(f"{context} returned non-numeric Retry-After header: {retry_after!r}")
+
+    if retry_after_seconds <= 0:
+        fail(f"{context} returned invalid Retry-After value: {retry_after_seconds}")
+    return retry_after_seconds
+
 
 def with_test_ip(headers=None):
     merged = dict(headers or {})
@@ -434,6 +448,22 @@ def test_e2e():
     )
     expect_status(response, 200, "Verify registration with valid token")
     print("Verified verify registration succeeds with valid token")
+
+    print("Testing auth rate limit includes Retry-After header...")
+    rate_limited_ip_headers = {"X-Forwarded-For": "198.51.100.250"}
+    for attempt in range(6):
+        response = requests.post(
+            f"{BASE_URL}/auth/login",
+            json={"email": "rate-limit-test@example.com", "password": "invalid-password"},
+            headers=rate_limited_ip_headers,
+            timeout=10,
+        )
+        if attempt < 5:
+            expect_status(response, 401, f"Auth rate-limit setup attempt {attempt + 1}")
+        else:
+            expect_status(response, 429, "Auth rate-limit check")
+            retry_after_seconds = expect_retry_after_header(response, "Auth rate-limit check")
+            print(f"Verified Retry-After header on 429 response: {retry_after_seconds}s")
 
     print("\n=== ALL TESTS PASSED ===")
 

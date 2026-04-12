@@ -587,4 +587,11 @@ func TestRateLimiter_Middleware_BlocksRequest(t *testing.T) {
 	if retryAfter == "" {
 		t.Error("Retry-After header should be set")
 	}
+	parsedRetryAfter, err := strconv.Atoi(retryAfter)
+	if err != nil {
+		t.Fatalf("Retry-After should be numeric, got %q: %v", retryAfter, err)
+	}
+	if parsedRetryAfter != int(time.Minute.Seconds()) {
+		t.Errorf("Retry-After = %d, want %d", parsedRetryAfter, int(time.Minute.Seconds()))
+	}
 }

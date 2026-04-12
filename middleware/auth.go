@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,7 +81,7 @@ func (rl *RateLimiter) Middleware() echo.MiddlewareFunc {
 
 			if !rl.Allow(ip) {
 				retryAfter := int(rl.window.Seconds())
-				c.Response().Header().Set("Retry-After", string(rune(retryAfter)))
+				c.Response().Header().Set("Retry-After", strconv.Itoa(retryAfter))
 				return c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
 					Code:    "RATE_LIMIT_EXCEEDED",
 					Message: "Too many requests. Please try again later.",
