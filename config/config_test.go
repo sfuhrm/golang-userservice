@@ -18,6 +18,8 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("JWT_SECRET_FILE")
 	os.Unsetenv("JWT_ISSUER")
 	os.Unsetenv("JWT_AUDIENCE")
+	os.Unsetenv("JWT_EXPIRE")
+	os.Unsetenv("REFRESH_EXPIRE")
 	os.Unsetenv("RATE_LIMIT")
 	os.Unsetenv("RATE_LIMIT_WINDOW")
 	os.Unsetenv("AUTH_RATE_LIMIT")
@@ -87,6 +89,8 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("JWT_SECRET", "test-secret-from-env")
 	os.Setenv("JWT_ISSUER", "userservice")
 	os.Setenv("JWT_AUDIENCE", "userservice-api")
+	os.Setenv("JWT_EXPIRE", "20m")
+	os.Setenv("REFRESH_EXPIRE", "240h")
 	os.Setenv("RATE_LIMIT", "250")
 	os.Setenv("RATE_LIMIT_WINDOW", "30m")
 	os.Setenv("AUTH_RATE_LIMIT", "25")
@@ -106,6 +110,8 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("JWT_SECRET")
 		os.Unsetenv("JWT_ISSUER")
 		os.Unsetenv("JWT_AUDIENCE")
+		os.Unsetenv("JWT_EXPIRE")
+		os.Unsetenv("REFRESH_EXPIRE")
 		os.Unsetenv("RATE_LIMIT")
 		os.Unsetenv("RATE_LIMIT_WINDOW")
 		os.Unsetenv("AUTH_RATE_LIMIT")
@@ -144,6 +150,12 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	}
 	if cfg.JWTAudience != "userservice-api" {
 		t.Errorf("JWTAudience = %s, want userservice-api", cfg.JWTAudience)
+	}
+	if cfg.JWTExpire != 20*time.Minute {
+		t.Errorf("JWTExpire = %v, want 20m", cfg.JWTExpire)
+	}
+	if cfg.RefreshExpire != 240*time.Hour {
+		t.Errorf("RefreshExpire = %v, want 240h", cfg.RefreshExpire)
 	}
 	if cfg.RateLimit != 250 {
 		t.Errorf("RateLimit = %d, want 250", cfg.RateLimit)
@@ -235,10 +247,14 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	os.Setenv("AUTH_RATE_LIMIT", "-3")
 	os.Setenv("REFRESH_RATE_LIMIT", "invalid")
 	os.Setenv("RATE_LIMIT_WINDOW", "not-a-duration")
+	os.Setenv("JWT_EXPIRE", "not-a-duration")
+	os.Setenv("REFRESH_EXPIRE", "-3h")
 	defer os.Unsetenv("RATE_LIMIT")
 	defer os.Unsetenv("AUTH_RATE_LIMIT")
 	defer os.Unsetenv("REFRESH_RATE_LIMIT")
 	defer os.Unsetenv("RATE_LIMIT_WINDOW")
+	defer os.Unsetenv("JWT_EXPIRE")
+	defer os.Unsetenv("REFRESH_EXPIRE")
 
 	cfg := Load()
 
@@ -253,6 +269,12 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	}
 	if cfg.RateLimitWindow != 15*time.Minute {
 		t.Errorf("RateLimitWindow = %v, want default 15m", cfg.RateLimitWindow)
+	}
+	if cfg.JWTExpire != 15*time.Minute {
+		t.Errorf("JWTExpire = %v, want default 15m", cfg.JWTExpire)
+	}
+	if cfg.RefreshExpire != 7*24*time.Hour {
+		t.Errorf("RefreshExpire = %v, want default 7d", cfg.RefreshExpire)
 	}
 }
 

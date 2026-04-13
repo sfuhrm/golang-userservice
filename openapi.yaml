@@ -145,8 +145,8 @@ paths:
         Returns an access token (JWT) and a refresh token.
         
         **Token Details:**
-        - Access token expires in 15 minutes
-        - Refresh token expires in 7 days
+        - Access token expires in 15 minutes by default (`JWT_EXPIRE`)
+        - Refresh token expires in 7 days by default (`REFRESH_EXPIRE`)
         - Access token is a JWT string
         - Refresh token is an opaque UUID string (not a JWT)
       tags:
