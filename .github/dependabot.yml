@@ -24,3 +24,7 @@ updates:
     labels:
       - "github-actions"
       - "security"
+  - package-ecosystem: "docker"
+    directory: "/" # Sucht im Root nach Dockerfiles
+    schedule:
+      interval: "weekly"
