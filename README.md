@@ -76,6 +76,61 @@ JWT_PUBLIC_KEY_FILE=./secrets/jwt_public.pem \
 go run main.go
 ```
 
+### Generate JWT Key Pairs (RSA / EC)
+
+Use OpenSSL to generate private/public key pairs for asymmetric JWT algorithms.
+
+```bash
+mkdir -p secrets
+```
+
+#### RS256 (RSA, recommended 2048+ bits)
+
+```bash
+# Private key
+openssl genpkey -algorithm RSA \
+  -pkeyopt rsa_keygen_bits:2048 \
+  -out secrets/jwt_rsa_private.pem
+
+# Public key
+openssl pkey -in secrets/jwt_rsa_private.pem -pubout -out secrets/jwt_rsa_public.pem
+```
+
+Use with:
+
+```bash
+JWT_ALGORITHM=RS256
+JWT_PRIVATE_KEY_FILE=./secrets/jwt_rsa_private.pem
+JWT_PUBLIC_KEY_FILE=./secrets/jwt_rsa_public.pem
+```
+
+#### ES256 (ECDSA P-256)
+
+```bash
+# Private key (P-256)
+openssl genpkey -algorithm EC \
+  -pkeyopt ec_paramgen_curve:P-256 \
+  -out secrets/jwt_ec_private.pem
+
+# Public key
+openssl pkey -in secrets/jwt_ec_private.pem -pubout -out secrets/jwt_ec_public.pem
+```
+
+Use with:
+
+```bash
+JWT_ALGORITHM=ES256
+JWT_PRIVATE_KEY_FILE=./secrets/jwt_ec_private.pem
+JWT_PUBLIC_KEY_FILE=./secrets/jwt_ec_public.pem
+```
+
+If you use the default `docker-compose.yml` settings (`JWT_ALGORITHM=RS256`), generate directly to:
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out secrets/jwt_private.pem
+openssl pkey -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
+```
+
 ## Configuration
 
 Configuration is loaded from environment variables.
