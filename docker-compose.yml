@@ -11,7 +11,10 @@ services:
       - DB_USER=userservice
       - DB_PASSWORD=userservice
       - DB_NAME=userservice
-      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - JWT_ALGORITHM=RS256
+      - JWT_PRIVATE_KEY_FILE=/run/secrets/jwt_private.pem
+      - JWT_PUBLIC_KEY_FILE=/run/secrets/jwt_public.pem
+      # - JWT_SECRET_FILE=/run/secrets/jwt_secret.txt
       - ENABLE_DEBUG_COVERAGE=true
       # - RATE_LIMIT=100
       # - AUTH_RATE_LIMIT=5

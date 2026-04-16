@@ -87,8 +87,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Create jwt secret
-        run: echo "test-jwt-secret-key-for-ci" > secrets/jwt_secret
+      - name: Create JWT RSA key pair
+        run: |
+          openssl genrsa -out secrets/jwt_private.pem 2048
+          openssl rsa -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
 
       - name: Build app
         run: docker compose build app

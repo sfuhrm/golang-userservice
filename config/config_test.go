@@ -14,8 +14,13 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("DB_PASSWORD")
 	os.Unsetenv("DB_PASSWORD_FILE")
 	os.Unsetenv("DB_NAME")
+	os.Unsetenv("JWT_ALGORITHM")
 	os.Unsetenv("JWT_SECRET")
 	os.Unsetenv("JWT_SECRET_FILE")
+	os.Unsetenv("JWT_PRIVATE_KEY")
+	os.Unsetenv("JWT_PRIVATE_KEY_FILE")
+	os.Unsetenv("JWT_PUBLIC_KEY")
+	os.Unsetenv("JWT_PUBLIC_KEY_FILE")
 	os.Unsetenv("JWT_ISSUER")
 	os.Unsetenv("JWT_AUDIENCE")
 	os.Unsetenv("JWT_EXPIRE")
@@ -50,8 +55,17 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.DBName != "userservice" {
 		t.Errorf("DBName = %s, want userservice", cfg.DBName)
 	}
+	if cfg.JWTAlgorithm != "HS256" {
+		t.Errorf("JWTAlgorithm = %s, want HS256", cfg.JWTAlgorithm)
+	}
 	if cfg.JWTSecret == "" {
 		t.Error("JWTSecret should not be empty")
+	}
+	if cfg.JWTPrivateKey != "" {
+		t.Errorf("JWTPrivateKey = %q, want empty", cfg.JWTPrivateKey)
+	}
+	if cfg.JWTPublicKey != "" {
+		t.Errorf("JWTPublicKey = %q, want empty", cfg.JWTPublicKey)
 	}
 	if cfg.JWTIssuer != "" {
 		t.Errorf("JWTIssuer = %s, want empty", cfg.JWTIssuer)
@@ -90,7 +104,10 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("DB_PASSWORD", "testpass")
 	os.Unsetenv("DB_PASSWORD_FILE")
 	os.Setenv("DB_NAME", "testdb")
+	os.Setenv("JWT_ALGORITHM", "RS256")
 	os.Setenv("JWT_SECRET", "test-secret-from-env")
+	os.Setenv("JWT_PRIVATE_KEY", "private-key-from-env")
+	os.Setenv("JWT_PUBLIC_KEY", "public-key-from-env")
 	os.Setenv("JWT_ISSUER", "userservice")
 	os.Setenv("JWT_AUDIENCE", "userservice-api")
 	os.Setenv("JWT_EXPIRE", "20m")
@@ -112,7 +129,10 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("DB_PASSWORD")
 		os.Unsetenv("DB_PASSWORD_FILE")
 		os.Unsetenv("DB_NAME")
+		os.Unsetenv("JWT_ALGORITHM")
 		os.Unsetenv("JWT_SECRET")
+		os.Unsetenv("JWT_PRIVATE_KEY")
+		os.Unsetenv("JWT_PUBLIC_KEY")
 		os.Unsetenv("JWT_ISSUER")
 		os.Unsetenv("JWT_AUDIENCE")
 		os.Unsetenv("JWT_EXPIRE")
@@ -148,8 +168,17 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	if cfg.DBName != "testdb" {
 		t.Errorf("DBName = %s, want testdb", cfg.DBName)
 	}
+	if cfg.JWTAlgorithm != "RS256" {
+		t.Errorf("JWTAlgorithm = %s, want RS256", cfg.JWTAlgorithm)
+	}
 	if cfg.JWTSecret != "test-secret-from-env" {
 		t.Errorf("JWTSecret = %s, want test-secret-from-env", cfg.JWTSecret)
+	}
+	if cfg.JWTPrivateKey != "private-key-from-env" {
+		t.Errorf("JWTPrivateKey = %s, want private-key-from-env", cfg.JWTPrivateKey)
+	}
+	if cfg.JWTPublicKey != "public-key-from-env" {
+		t.Errorf("JWTPublicKey = %s, want public-key-from-env", cfg.JWTPublicKey)
 	}
 	if cfg.JWTIssuer != "userservice" {
 		t.Errorf("JWTIssuer = %s, want userservice", cfg.JWTIssuer)
@@ -207,6 +236,29 @@ func TestLoad_JWTSecretFromFile(t *testing.T) {
 	}
 }
 
+func TestLoad_JWTKeysFromFile(t *testing.T) {
+	os.WriteFile("/tmp/test_jwt_private.pem", []byte("private-key-from-file\n"), 0644)
+	os.WriteFile("/tmp/test_jwt_public.pem", []byte("public-key-from-file\n"), 0644)
+	defer os.Remove("/tmp/test_jwt_private.pem")
+	defer os.Remove("/tmp/test_jwt_public.pem")
+
+	os.Setenv("JWT_PRIVATE_KEY_FILE", "/tmp/test_jwt_private.pem")
+	os.Setenv("JWT_PUBLIC_KEY_FILE", "/tmp/test_jwt_public.pem")
+	os.Unsetenv("JWT_PRIVATE_KEY")
+	os.Unsetenv("JWT_PUBLIC_KEY")
+	defer os.Unsetenv("JWT_PRIVATE_KEY_FILE")
+	defer os.Unsetenv("JWT_PUBLIC_KEY_FILE")
+
+	cfg := Load()
+
+	if cfg.JWTPrivateKey != "private-key-from-file" {
+		t.Errorf("JWTPrivateKey = %s, want private-key-from-file", cfg.JWTPrivateKey)
+	}
+	if cfg.JWTPublicKey != "public-key-from-file" {
+		t.Errorf("JWTPublicKey = %s, want public-key-from-file", cfg.JWTPublicKey)
+	}
+}
+
 func TestLoad_DBPasswordFromFile(t *testing.T) {
 	os.WriteFile("/tmp/test_db_password.txt", []byte("db-pass-from-file\n"), 0644)
 	defer os.Remove("/tmp/test_db_password.txt")
@@ -248,6 +300,16 @@ func TestLoad_JWTSecretFileNotFound(t *testing.T) {
 	}
 	if cfg.JWTSecret != "your-secret-key-change-in-production" {
 		t.Errorf("JWTSecret = %s, want default", cfg.JWTSecret)
+	}
+}
+
+func TestLoad_JWTAlgorithmInvalidFallsBackToDefault(t *testing.T) {
+	os.Setenv("JWT_ALGORITHM", "invalid")
+	defer os.Unsetenv("JWT_ALGORITHM")
+
+	cfg := Load()
+	if cfg.JWTAlgorithm != "HS256" {
+		t.Errorf("JWTAlgorithm = %s, want HS256", cfg.JWTAlgorithm)
 	}
 }
 

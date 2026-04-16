@@ -18,7 +18,10 @@ type Config struct {
 	DBUser                   string        // Database username (default: userservice)
 	DBPassword               string        // Database password (default: userservice)
 	DBName                   string        // Database name (default: userservice)
-	JWTSecret                string        // Secret key for signing JWT tokens
+	JWTAlgorithm             string        // JWT signing algorithm: HS256 or RS256
+	JWTSecret                string        // Secret key for HS256 JWT tokens
+	JWTPrivateKey            string        // RSA private key PEM for RS256 token signing
+	JWTPublicKey             string        // RSA public key PEM for RS256 token verification
 	JWTIssuer                string        // Optional JWT issuer claim (iss)
 	JWTAudience              string        // Optional JWT audience claim (aud)
 	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
@@ -36,7 +39,7 @@ type Config struct {
 
 // Load returns a new Config instance with values loaded from environment variables.
 // If an environment variable is not set, the default value is used.
-// DB password and JWT secret can be read from files (for Docker secrets) or env vars.
+// DB password and JWT secrets/keys can be read from files (for Docker secrets) or env vars.
 func Load() *Config {
 	return &Config{
 		ServerPort:               getEnv("SERVER_PORT", "8080"),
@@ -45,7 +48,10 @@ func Load() *Config {
 		DBUser:                   getEnv("DB_USER", "userservice"),
 		DBPassword:               getDBPassword(),
 		DBName:                   getEnv("DB_NAME", "userservice"),
+		JWTAlgorithm:             getJWTAlgorithm(),
 		JWTSecret:                getJWTSecret(),
+		JWTPrivateKey:            getJWTPrivateKey(),
+		JWTPublicKey:             getJWTPublicKey(),
 		JWTIssuer:                getEnv("JWT_ISSUER", ""),
 		JWTAudience:              getEnv("JWT_AUDIENCE", ""),
 		JWTExpire:                getEnvDuration("JWT_EXPIRE", 15*time.Minute),
@@ -79,6 +85,17 @@ func getDBPassword() string {
 	return "userservice"
 }
 
+// getJWTAlgorithm reads JWT algorithm and falls back to HS256 on unset/invalid values.
+func getJWTAlgorithm() string {
+	algorithm := strings.ToUpper(getEnv("JWT_ALGORITHM", "HS256"))
+	switch algorithm {
+	case "HS256", "RS256":
+		return algorithm
+	default:
+		return "HS256"
+	}
+}
+
 // getJWTSecret reads the JWT secret from a file or environment variable.
 // Priority: 1) JWT_SECRET_FILE env var (path to secret file), 2) JWT_SECRET env var, 3) default
 func getJWTSecret() string {
@@ -94,6 +111,40 @@ func getJWTSecret() string {
 	}
 
 	return "your-secret-key-change-in-production"
+}
+
+// getJWTPrivateKey reads the RSA private key from a file or environment variable.
+// Priority: 1) JWT_PRIVATE_KEY_FILE env var, 2) JWT_PRIVATE_KEY env var, 3) empty
+func getJWTPrivateKey() string {
+	if keyFile := os.Getenv("JWT_PRIVATE_KEY_FILE"); keyFile != "" {
+		key, err := os.ReadFile(keyFile)
+		if err == nil {
+			return strings.TrimSpace(string(key))
+		}
+	}
+
+	if key := os.Getenv("JWT_PRIVATE_KEY"); key != "" {
+		return strings.TrimSpace(key)
+	}
+
+	return ""
+}
+
+// getJWTPublicKey reads the RSA public key from a file or environment variable.
+// Priority: 1) JWT_PUBLIC_KEY_FILE env var, 2) JWT_PUBLIC_KEY env var, 3) empty
+func getJWTPublicKey() string {
+	if keyFile := os.Getenv("JWT_PUBLIC_KEY_FILE"); keyFile != "" {
+		key, err := os.ReadFile(keyFile)
+		if err == nil {
+			return strings.TrimSpace(string(key))
+		}
+	}
+
+	if key := os.Getenv("JWT_PUBLIC_KEY"); key != "" {
+		return strings.TrimSpace(key)
+	}
+
+	return ""
 }
 
 // getEnv retrieves an environment variable value or returns a default if not set.

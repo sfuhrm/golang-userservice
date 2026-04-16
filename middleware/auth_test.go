@@ -1,6 +1,10 @@
 package middleware
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -12,6 +16,26 @@ import (
 	"userservice/config"
 	"userservice/models"
 )
+
+func generateRSAKeyPairPEM(t *testing.T) (string, string) {
+	t.Helper()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate private key: %v", err)
+	}
+
+	privateDER := x509.MarshalPKCS1PrivateKey(privateKey)
+	privatePEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privateDER})
+
+	publicDER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		t.Fatalf("failed to marshal public key: %v", err)
+	}
+	publicPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicDER})
+
+	return string(privatePEM), string(publicPEM)
+}
 
 func TestGenerateAccessToken(t *testing.T) {
 	cfg := &config.Config{
@@ -26,6 +50,46 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	if token == "" {
 		t.Error("GenerateAccessToken() should return a non-empty token")
+	}
+}
+
+func TestGenerateAccessToken_RS256(t *testing.T) {
+	privateKeyPEM, publicKeyPEM := generateRSAKeyPairPEM(t)
+	cfg := &config.Config{
+		JWTAlgorithm:  "RS256",
+		JWTPrivateKey: privateKeyPEM,
+		JWTPublicKey:  publicKeyPEM,
+		JWTExpire:     15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken() error = %v", err)
+	}
+	if token == "" {
+		t.Error("GenerateAccessToken() should return a non-empty token")
+	}
+
+	parsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return jwt.ParseRSAPublicKeyFromPEM([]byte(publicKeyPEM))
+	})
+	if err != nil {
+		t.Fatalf("jwt.Parse() error = %v", err)
+	}
+	if parsed.Method.Alg() != jwt.SigningMethodRS256.Alg() {
+		t.Errorf("token signing method = %s, want %s", parsed.Method.Alg(), jwt.SigningMethodRS256.Alg())
+	}
+}
+
+func TestGenerateAccessToken_RS256MissingPrivateKey(t *testing.T) {
+	cfg := &config.Config{
+		JWTAlgorithm: "RS256",
+		JWTExpire:    15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+	if err == nil {
+		t.Errorf("GenerateAccessToken() error = nil, want non-nil, token = %q", token)
 	}
 }
 
@@ -379,6 +443,43 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
+	if rec.Body.String() != "user-123" {
+		t.Errorf("JWTAuth() userID = %s, want user-123", rec.Body.String())
+	}
+}
+
+func TestJWTAuth_ValidToken_RS256(t *testing.T) {
+	privateKeyPEM, publicKeyPEM := generateRSAKeyPairPEM(t)
+	cfg := &config.Config{
+		JWTAlgorithm:  "RS256",
+		JWTPrivateKey: privateKeyPEM,
+		JWTPublicKey:  publicKeyPEM,
+		JWTExpire:     15 * time.Minute,
+	}
+
+	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+	if err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handler := JWTAuth(cfg)(func(c echo.Context) error {
+		userID := c.Get("userID").(string)
+		return c.String(http.StatusOK, userID)
+	})
+
+	err = handler(c)
+	if err != nil {
+		t.Errorf("JWTAuth() error = %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusOK)
+	}
 	if rec.Body.String() != "user-123" {
 		t.Errorf("JWTAuth() userID = %s, want user-123", rec.Body.String())
 	}

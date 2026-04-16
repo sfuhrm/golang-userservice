@@ -18,7 +18,7 @@ info:
     Access tokens are JWTs in the format `<base64url(header)>.<base64url(payload)>.<base64url(signature)>`.
 
     * **Header**:
-      * `alg`: `HS256` (HMAC-SHA256)
+      * `alg`: `HS256` or `RS256` (configured by server environment)
       * `typ`: `JWT`
     * **Payload Claims**:
       * `sub`: Authenticated user UUID (subject claim)
@@ -26,7 +26,8 @@ info:
       * `iat`: Issued-at time (Unix timestamp seconds)
       * `exp`: Expiration time (Unix timestamp seconds)
     * **Signature**:
-      * `HMACSHA256(base64url(header) + "." + base64url(payload), JWT_SECRET)`
+      * HS256: `HMACSHA256(base64url(header) + "." + base64url(payload), JWT_SECRET)`
+      * RS256: `RSASSA-PKCS1-v1_5-SHA256(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
 
     JWT payload data is not encrypted, only signed.
     Refresh tokens are opaque UUID values stored server-side (not JWTs).
@@ -1143,13 +1144,13 @@ components:
         alg:
           type: string
           description: Signing algorithm identifier.
-          example: HS256
+          example: RS256
         typ:
           type: string
           description: Token type.
           example: JWT
       example:
-        alg: HS256
+        alg: RS256
         typ: JWT
 
     JWTAccessTokenClaims:
@@ -1192,7 +1193,7 @@ components:
             Signed JWT access token in the format `<base64url(header)>.<base64url(payload)>.<base64url(signature)>`.
             Header fields: `alg`, `typ`.
             Payload claims: `sub`, `roles`, `iat`, `exp`.
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         refreshToken:
           type: string
           description: Opaque refresh token UUID for obtaining new access tokens (not a JWT)

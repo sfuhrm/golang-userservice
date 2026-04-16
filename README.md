@@ -47,6 +47,10 @@ docker compose logs -f app
 The API will be available at `http://localhost:8080`
 Swagger UI will be available at `http://localhost:8081`
 
+The compose setup is preconfigured for `JWT_ALGORITHM=RS256` and reads key files from:
+- `./secrets/jwt_private.pem`
+- `./secrets/jwt_public.pem`
+
 ### Local Development
 
 ```bash
@@ -66,7 +70,9 @@ DB_PORT=3306 \
 DB_USER=userservice \
 DB_PASSWORD=userservice \
 DB_NAME=userservice \
-JWT_SECRET=dev-secret-change-me \
+JWT_ALGORITHM=RS256 \
+JWT_PRIVATE_KEY_FILE=./secrets/jwt_private.pem \
+JWT_PUBLIC_KEY_FILE=./secrets/jwt_public.pem \
 go run main.go
 ```
 
@@ -83,8 +89,13 @@ Configuration is loaded from environment variables.
 | `DB_PASSWORD_FILE` | - | Path to file containing database password (for Docker secrets) |
 | `DB_PASSWORD` | `userservice` | Database password |
 | `DB_NAME` | `userservice` | Database name |
-| `JWT_SECRET_FILE` | - | Path to file containing JWT secret (for Docker secrets) |
-| `JWT_SECRET` | `your-secret-key-change-in-production` | Secret key for signing JWT tokens (fallback) |
+| `JWT_ALGORITHM` | `HS256` | Access token signing algorithm (`HS256` or `RS256`) |
+| `JWT_SECRET_FILE` | - | Path to file containing JWT secret (HS256) |
+| `JWT_SECRET` | `your-secret-key-change-in-production` | Secret key for HS256 signing (fallback) |
+| `JWT_PRIVATE_KEY_FILE` | - | Path to RSA private key PEM file (RS256 signing) |
+| `JWT_PRIVATE_KEY` | - | RSA private key PEM (RS256 signing) |
+| `JWT_PUBLIC_KEY_FILE` | - | Path to RSA public key PEM file (RS256 verification) |
+| `JWT_PUBLIC_KEY` | - | RSA public key PEM (RS256 verification; optional when private key is provided) |
 | `JWT_ISSUER` | - | Optional JWT issuer claim (`iss`) for access tokens. When set, incoming access tokens must match this issuer. |
 | `JWT_AUDIENCE` | - | Optional JWT audience claim (`aud`) for access tokens. When set, incoming access tokens must include this audience. |
 | `JWT_EXPIRE` | `15m` | Access token lifetime (Go duration, e.g. `5m`, `30m`, `1h`) |
@@ -124,7 +135,7 @@ The `accessToken` returned by `/v1/auth/login` and `/v1/auth/refresh` is a JWT w
 
 `<base64url(header)>.<base64url(payload)>.<base64url(signature)>`
 
-JWT content is signed, not encrypted. Anyone who has the token can decode header/payload, but cannot forge a valid signature without the server secret.
+JWT content is signed, not encrypted. Anyone who has the token can decode header/payload, but cannot forge a valid signature without the server signing key.
 
 **1) Header**
 
@@ -132,12 +143,12 @@ The header defines how the token is signed:
 
 ```json
 {
-  "alg": "HS256",
+  "alg": "RS256",
   "typ": "JWT"
 }
 ```
 
-- `alg`: Signing algorithm (`HS256`, HMAC-SHA256 in this service)
+- `alg`: Signing algorithm from `JWT_ALGORITHM` (`HS256` or `RS256`)
 - `typ`: Token type (`JWT`)
 
 **2) Payload (claims)**
@@ -168,7 +179,8 @@ The payload contains user identity and authorization data used by middleware:
 
 The signature protects integrity:
 
-`HMACSHA256(base64url(header) + "." + base64url(payload), JWT_SECRET)`
+- For `HS256`: `HMACSHA256(base64url(header) + "." + base64url(payload), JWT_SECRET)`
+- For `RS256`: `RSASSA-PKCS1-v1_5-SHA256(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
 
 If header or payload is modified, signature validation fails and the API returns `401`.
 
@@ -438,8 +450,10 @@ import (
 
 func main() {
     cfg := &config.Config{
-        JWTSecret: "your-secret-key",
-        JWTExpire: 15 * time.Minute,
+        JWTAlgorithm:  "RS256",
+        JWTPrivateKey: "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+        JWTPublicKey:  "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+        JWTExpire:     15 * time.Minute,
     }
     token, _ := middleware.GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
     fmt.Println(token)
@@ -448,7 +462,10 @@ func main() {
 
 ## Security Considerations
 
-- Change `JWT_SECRET` in production to a secure random value
+- Prefer `JWT_ALGORITHM=RS256` in production
+- Protect `JWT_PRIVATE_KEY` / `JWT_PRIVATE_KEY_FILE` as a secret
+- Rotate JWT keys regularly
+- If you use HS256, set `JWT_SECRET` to a secure random value
 - Use HTTPS in production (configure your reverse proxy)
 - Configure external mail service URLs for production use (see environment variables)
 - Refresh tokens are invalidated server-side on logout and password change
