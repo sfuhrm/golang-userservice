@@ -200,29 +200,28 @@ func GenerateAccessTokenWithJTI(userID string, roles []models.UserRole, jti stri
 
 func jwtAlgorithm(cfg *config.Config) string {
 	algorithm := strings.ToUpper(strings.TrimSpace(cfg.JWTAlgorithm))
-	if algorithm == "" {
+	switch algorithm {
+	case "", jwt.SigningMethodHS256.Alg():
+		return jwt.SigningMethodHS256.Alg()
+	case jwt.SigningMethodRS256.Alg(), jwt.SigningMethodES256.Alg():
+		return algorithm
+	default:
 		return jwt.SigningMethodHS256.Alg()
 	}
-	return algorithm
 }
 
 func tokenValidationKeyFunc(cfg *config.Config) jwt.Keyfunc {
 	return func(token *jwt.Token) (interface{}, error) {
 		algorithm := jwtAlgorithm(cfg)
-		switch algorithm {
-		case jwt.SigningMethodHS256.Alg():
-			if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
-				return nil, fmt.Errorf("unexpected signing method: %s", token.Method.Alg())
-			}
-			return []byte(cfg.JWTSecret), nil
-		case jwt.SigningMethodRS256.Alg():
-			if token.Method.Alg() != jwt.SigningMethodRS256.Alg() {
-				return nil, fmt.Errorf("unexpected signing method: %s", token.Method.Alg())
-			}
-			return jwtVerificationKey(cfg)
-		default:
-			return nil, fmt.Errorf("unsupported jwt algorithm: %s", algorithm)
+		if token.Method.Alg() != algorithm {
+			return nil, fmt.Errorf("unexpected signing method: %s", token.Method.Alg())
 		}
+
+		verificationKey, err := tokenVerificationKey(cfg, algorithm)
+		if err != nil {
+			return nil, err
+		}
+		return verificationKey, nil
 	}
 }
 
@@ -237,12 +236,31 @@ func tokenSigningConfig(cfg *config.Config) (jwt.SigningMethod, interface{}, err
 			return nil, nil, fmt.Errorf("parse jwt private key: %w", err)
 		}
 		return jwt.SigningMethodRS256, privateKey, nil
+	case jwt.SigningMethodES256.Alg():
+		privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(cfg.JWTPrivateKey))
+		if err != nil {
+			return nil, nil, fmt.Errorf("parse jwt private key: %w", err)
+		}
+		return jwt.SigningMethodES256, privateKey, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported jwt algorithm: %s", algorithm)
 	}
 }
 
-func jwtVerificationKey(cfg *config.Config) (interface{}, error) {
+func tokenVerificationKey(cfg *config.Config, algorithm string) (interface{}, error) {
+	switch algorithm {
+	case jwt.SigningMethodHS256.Alg():
+		return []byte(cfg.JWTSecret), nil
+	case jwt.SigningMethodRS256.Alg():
+		return jwtRS256VerificationKey(cfg)
+	case jwt.SigningMethodES256.Alg():
+		return jwtES256VerificationKey(cfg)
+	default:
+		return nil, fmt.Errorf("unsupported jwt algorithm: %s", algorithm)
+	}
+}
+
+func jwtRS256VerificationKey(cfg *config.Config) (interface{}, error) {
 	if strings.TrimSpace(cfg.JWTPublicKey) != "" {
 		publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(cfg.JWTPublicKey))
 		if err != nil {
@@ -252,6 +270,22 @@ func jwtVerificationKey(cfg *config.Config) (interface{}, error) {
 	}
 
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(cfg.JWTPrivateKey))
+	if err != nil {
+		return nil, fmt.Errorf("parse jwt private key: %w", err)
+	}
+	return &privateKey.PublicKey, nil
+}
+
+func jwtES256VerificationKey(cfg *config.Config) (interface{}, error) {
+	if strings.TrimSpace(cfg.JWTPublicKey) != "" {
+		publicKey, err := jwt.ParseECPublicKeyFromPEM([]byte(cfg.JWTPublicKey))
+		if err != nil {
+			return nil, fmt.Errorf("parse jwt public key: %w", err)
+		}
+		return publicKey, nil
+	}
+
+	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(cfg.JWTPrivateKey))
 	if err != nil {
 		return nil, fmt.Errorf("parse jwt private key: %w", err)
 	}

@@ -18,10 +18,10 @@ type Config struct {
 	DBUser                   string        // Database username (default: userservice)
 	DBPassword               string        // Database password (default: userservice)
 	DBName                   string        // Database name (default: userservice)
-	JWTAlgorithm             string        // JWT signing algorithm: HS256 or RS256
+	JWTAlgorithm             string        // JWT signing algorithm: HS256, RS256, or ES256
 	JWTSecret                string        // Secret key for HS256 JWT tokens
-	JWTPrivateKey            string        // RSA private key PEM for RS256 token signing
-	JWTPublicKey             string        // RSA public key PEM for RS256 token verification
+	JWTPrivateKey            string        // Private key PEM for RS256/ES256 token signing
+	JWTPublicKey             string        // Public key PEM for RS256/ES256 token verification
 	JWTIssuer                string        // Optional JWT issuer claim (iss)
 	JWTAudience              string        // Optional JWT audience claim (aud)
 	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
@@ -89,7 +89,7 @@ func getDBPassword() string {
 func getJWTAlgorithm() string {
 	algorithm := strings.ToUpper(getEnv("JWT_ALGORITHM", "HS256"))
 	switch algorithm {
-	case "HS256", "RS256":
+	case "HS256", "RS256", "ES256":
 		return algorithm
 	default:
 		return "HS256"
@@ -113,7 +113,7 @@ func getJWTSecret() string {
 	return "your-secret-key-change-in-production"
 }
 
-// getJWTPrivateKey reads the RSA private key from a file or environment variable.
+// getJWTPrivateKey reads the private key from a file or environment variable.
 // Priority: 1) JWT_PRIVATE_KEY_FILE env var, 2) JWT_PRIVATE_KEY env var, 3) empty
 func getJWTPrivateKey() string {
 	if keyFile := os.Getenv("JWT_PRIVATE_KEY_FILE"); keyFile != "" {
@@ -130,7 +130,7 @@ func getJWTPrivateKey() string {
 	return ""
 }
 
-// getJWTPublicKey reads the RSA public key from a file or environment variable.
+// getJWTPublicKey reads the public key from a file or environment variable.
 // Priority: 1) JWT_PUBLIC_KEY_FILE env var, 2) JWT_PUBLIC_KEY env var, 3) empty
 func getJWTPublicKey() string {
 	if keyFile := os.Getenv("JWT_PUBLIC_KEY_FILE"); keyFile != "" {

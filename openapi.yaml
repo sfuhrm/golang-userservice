@@ -18,7 +18,7 @@ info:
     Access tokens are JWTs in the format `<base64url(header)>.<base64url(payload)>.<base64url(signature)>`.
 
     * **Header**:
-      * `alg`: `HS256` or `RS256` (configured by server environment)
+      * `alg`: `HS256`, `RS256`, or `ES256` (configured by server environment)
       * `typ`: `JWT`
     * **Payload Claims**:
       * `sub`: Authenticated user UUID (subject claim)
@@ -28,6 +28,7 @@ info:
     * **Signature**:
       * HS256: `HMACSHA256(base64url(header) + "." + base64url(payload), JWT_SECRET)`
       * RS256: `RSASSA-PKCS1-v1_5-SHA256(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
+      * ES256: `ECDSA-P256-SHA256(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
 
     JWT payload data is not encrypted, only signed.
     Refresh tokens are opaque UUID values stored server-side (not JWTs).

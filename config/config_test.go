@@ -313,6 +313,16 @@ func TestLoad_JWTAlgorithmInvalidFallsBackToDefault(t *testing.T) {
 	}
 }
 
+func TestLoad_JWTAlgorithmES256(t *testing.T) {
+	os.Setenv("JWT_ALGORITHM", "es256")
+	defer os.Unsetenv("JWT_ALGORITHM")
+
+	cfg := Load()
+	if cfg.JWTAlgorithm != "ES256" {
+		t.Errorf("JWTAlgorithm = %s, want ES256", cfg.JWTAlgorithm)
+	}
+}
+
 func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	os.Setenv("RATE_LIMIT", "not-an-int")
 	os.Setenv("AUTH_RATE_LIMIT", "-3")
