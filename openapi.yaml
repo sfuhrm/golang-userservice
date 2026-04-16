@@ -1495,11 +1495,11 @@ components:
           type: string
           format: uri
           description: Callback URL for password recovery verification
-          example: http://localhost:8080/v1/auth/verify-recovery
+          example: http://localhost:8080/v1/auth/reset-password
       example:
         email: john@example.com
         token: 550e8400-e29b-41d4-a716-446655440000
-        callback: http://localhost:8080/v1/auth/verify-recovery
+        callback: http://localhost:8080/v1/auth/reset-password
 
     VerifyRegistrationRequest:
       type: object

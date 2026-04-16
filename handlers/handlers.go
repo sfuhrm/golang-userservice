@@ -1023,9 +1023,6 @@ func (h *Handler) ListUsers(c echo.Context) error {
 	if totalCount > page*pageSize {
 		links = append(links, models.Link{Rel: "next", Href: "/v1/admin/users?page=" + strconv.Itoa(page+1) + "&pageSize=" + strconv.Itoa(pageSize), Method: "GET"})
 	}
-	if totalCount > page*pageSize {
-		links = append(links, models.Link{Rel: "next", Href: "/v1/admin/users?page=" + strconv.Itoa(page+1) + "&pageSize=" + strconv.Itoa(pageSize), Method: "GET"})
-	}
 
 	return c.JSON(http.StatusOK, models.UserListResponse{
 		Users:      users,

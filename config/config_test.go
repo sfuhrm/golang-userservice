@@ -24,6 +24,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("RATE_LIMIT_WINDOW")
 	os.Unsetenv("AUTH_RATE_LIMIT")
 	os.Unsetenv("REFRESH_RATE_LIMIT")
+	os.Unsetenv("ENABLE_DEBUG_COVERAGE")
 	os.Unsetenv("REGISTRATION_MAIL_URL")
 	os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 	os.Unsetenv("RECOVERY_MAIL_URL")
@@ -76,6 +77,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.RefreshRateLimit != 30 {
 		t.Errorf("RefreshRateLimit = %d, want 30", cfg.RefreshRateLimit)
 	}
+	if cfg.EnableDebugCoverage {
+		t.Errorf("EnableDebugCoverage = %v, want false", cfg.EnableDebugCoverage)
+	}
 }
 
 func TestLoad_FromEnvironment(t *testing.T) {
@@ -95,6 +99,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("RATE_LIMIT_WINDOW", "30m")
 	os.Setenv("AUTH_RATE_LIMIT", "25")
 	os.Setenv("REFRESH_RATE_LIMIT", "80")
+	os.Setenv("ENABLE_DEBUG_COVERAGE", "true")
 	os.Setenv("REGISTRATION_MAIL_URL", "http://mail.example.com/register")
 	os.Setenv("REGISTRATION_MAIL_CALLBACK_URL", "http://example.com/verify")
 	os.Setenv("RECOVERY_MAIL_URL", "http://mail.example.com/recover")
@@ -116,6 +121,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("RATE_LIMIT_WINDOW")
 		os.Unsetenv("AUTH_RATE_LIMIT")
 		os.Unsetenv("REFRESH_RATE_LIMIT")
+		os.Unsetenv("ENABLE_DEBUG_COVERAGE")
 		os.Unsetenv("REGISTRATION_MAIL_URL")
 		os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 		os.Unsetenv("RECOVERY_MAIL_URL")
@@ -168,6 +174,9 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	}
 	if cfg.RefreshRateLimit != 80 {
 		t.Errorf("RefreshRateLimit = %d, want 80", cfg.RefreshRateLimit)
+	}
+	if !cfg.EnableDebugCoverage {
+		t.Errorf("EnableDebugCoverage = %v, want true", cfg.EnableDebugCoverage)
 	}
 	if cfg.RegistrationMailURL != "http://mail.example.com/register" {
 		t.Errorf("RegistrationMailURL = %s, want http://mail.example.com/register", cfg.RegistrationMailURL)
@@ -249,12 +258,14 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	os.Setenv("RATE_LIMIT_WINDOW", "not-a-duration")
 	os.Setenv("JWT_EXPIRE", "not-a-duration")
 	os.Setenv("REFRESH_EXPIRE", "-3h")
+	os.Setenv("ENABLE_DEBUG_COVERAGE", "not-a-bool")
 	defer os.Unsetenv("RATE_LIMIT")
 	defer os.Unsetenv("AUTH_RATE_LIMIT")
 	defer os.Unsetenv("REFRESH_RATE_LIMIT")
 	defer os.Unsetenv("RATE_LIMIT_WINDOW")
 	defer os.Unsetenv("JWT_EXPIRE")
 	defer os.Unsetenv("REFRESH_EXPIRE")
+	defer os.Unsetenv("ENABLE_DEBUG_COVERAGE")
 
 	cfg := Load()
 
@@ -275,6 +286,9 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	}
 	if cfg.RefreshExpire != 7*24*time.Hour {
 		t.Errorf("RefreshExpire = %v, want default 7d", cfg.RefreshExpire)
+	}
+	if cfg.EnableDebugCoverage {
+		t.Errorf("EnableDebugCoverage = %v, want default false", cfg.EnableDebugCoverage)
 	}
 }
 
@@ -350,6 +364,33 @@ func TestGetEnvDuration(t *testing.T) {
 		result := getEnvDuration(tt.key, tt.defaultValue)
 		if result != tt.want {
 			t.Errorf("getEnvDuration(%s, %v) = %v, want %v", tt.key, tt.defaultValue, result, tt.want)
+		}
+	}
+}
+
+func TestGetEnvBool(t *testing.T) {
+	os.Setenv("TEST_BOOL_TRUE", "true")
+	os.Setenv("TEST_BOOL_FALSE", "false")
+	os.Setenv("TEST_BOOL_INVALID", "abc")
+	defer os.Unsetenv("TEST_BOOL_TRUE")
+	defer os.Unsetenv("TEST_BOOL_FALSE")
+	defer os.Unsetenv("TEST_BOOL_INVALID")
+
+	tests := []struct {
+		key          string
+		defaultValue bool
+		want         bool
+	}{
+		{"TEST_BOOL_TRUE", false, true},
+		{"TEST_BOOL_FALSE", true, false},
+		{"TEST_BOOL_INVALID", true, true},
+		{"TEST_BOOL_UNSET", false, false},
+	}
+
+	for _, tt := range tests {
+		result := getEnvBool(tt.key, tt.defaultValue)
+		if result != tt.want {
+			t.Errorf("getEnvBool(%s, %v) = %v, want %v", tt.key, tt.defaultValue, result, tt.want)
 		}
 	}
 }

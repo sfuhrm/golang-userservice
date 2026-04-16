@@ -12,6 +12,7 @@ services:
       - DB_PASSWORD=userservice
       - DB_NAME=userservice
       - JWT_SECRET_FILE=/run/secrets/jwt_secret
+      - ENABLE_DEBUG_COVERAGE=true
       # - RATE_LIMIT=100
       # - AUTH_RATE_LIMIT=5
       # - REFRESH_RATE_LIMIT=30
@@ -19,7 +20,7 @@ services:
       # - REGISTRATION_MAIL_URL=http://mail-service/register
       # - REGISTRATION_MAIL_CALLBACK_URL=http://localhost:8080/v1/auth/verify-registration
       # - RECOVERY_MAIL_URL=http://mail-service/recover
-      # - RECOVERY_MAIL_CALLBACK_URL=http://localhost:8080/v1/auth/verify-recovery
+      # - RECOVERY_MAIL_CALLBACK_URL=http://localhost:8080/v1/auth/reset-password
     volumes:
       - ./secrets:/run/secrets:ro
     depends_on:

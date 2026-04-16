@@ -56,23 +56,25 @@ func main() {
 
 	e.Use(standardLimiter.Middleware())
 
-	coverageTracker := middleware.NewCoverageTracker()
-	e.Use(coverageTracker.Middleware())
-
 	h := handlers.New(db, cfg)
 
 	e.GET("/q/health/live", h.Live)
 
-	e.GET("/debug/coverage", func(c echo.Context) error {
-		coverage := middleware.CalculateCoverage()
-		coveredRoutes := middleware.GetCoveredRoutes()
-		allRoutes := middleware.GetAllRoutes()
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"coverage":       coverage,
-			"covered_routes": coveredRoutes,
-			"total_routes":   allRoutes,
+	if cfg.EnableDebugCoverage {
+		coverageTracker := middleware.NewCoverageTracker()
+		e.Use(coverageTracker.Middleware())
+
+		e.GET("/debug/coverage", func(c echo.Context) error {
+			coverage := middleware.CalculateCoverage()
+			coveredRoutes := middleware.GetCoveredRoutes()
+			allRoutes := middleware.GetAllRoutes()
+			return c.JSON(http.StatusOK, map[string]interface{}{
+				"coverage":       coverage,
+				"covered_routes": coveredRoutes,
+				"total_routes":   allRoutes,
+			})
 		})
-	})
+	}
 
 	api := e.Group("/v1")
 

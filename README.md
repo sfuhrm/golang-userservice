@@ -28,7 +28,7 @@ A RESTful API service for user registration, authentication, and account managem
 
 ## Prerequisites
 
-- Go 1.21+
+- Go 1.26+
 - Docker & Docker Compose (for containerized deployment)
 - MySQL/MariaDB (if running locally without Docker)
 
@@ -38,10 +38,10 @@ A RESTful API service for user registration, authentication, and account managem
 
 ```bash
 # Start the application and database
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f app
+docker compose logs -f app
 ```
 
 The API will be available at `http://localhost:8080`
@@ -53,13 +53,20 @@ Swagger UI will be available at `http://localhost:8081`
 # Start MariaDB locally (or use an existing instance)
 docker run -d \
   --name userservice-db \
+  -p 3306:3306 \
   -e MARIADB_ROOT_PASSWORD=root \
   -e MARIADB_DATABASE=userservice \
   -e MARIADB_USER=userservice \
   -e MARIADB_PASSWORD=userservice \
   mariadb:10.11
 
-# Run the application
+# Run the application against local MariaDB
+DB_HOST=127.0.0.1 \
+DB_PORT=3306 \
+DB_USER=userservice \
+DB_PASSWORD=userservice \
+DB_NAME=userservice \
+JWT_SECRET=dev-secret-change-me \
 go run main.go
 ```
 
@@ -86,6 +93,7 @@ Configuration is loaded from environment variables.
 | `AUTH_RATE_LIMIT` | `5` | Auth endpoint rate limit requests per window (per IP) |
 | `REFRESH_RATE_LIMIT` | `30` | Refresh endpoint rate limit requests per window (per IP) |
 | `RATE_LIMIT_WINDOW` | `15m` | Rate-limit window duration (Go duration, e.g. `1m`, `15m`, `1h`) |
+| `ENABLE_DEBUG_COVERAGE` | `false` | Enables `/debug/coverage` endpoint and route coverage tracking middleware (for testing only) |
 
 ### External Mail Service Configuration (Optional)
 

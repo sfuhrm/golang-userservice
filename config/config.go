@@ -27,6 +27,7 @@ type Config struct {
 	RateLimitWindow          time.Duration // Rate limit time window (default: 15 minutes)
 	AuthRateLimit            int           // Auth endpoints rate limit (default: 5)
 	RefreshRateLimit         int           // Refresh endpoint rate limit (default: 30)
+	EnableDebugCoverage      bool          // Enables /debug/coverage endpoint and tracking middleware
 	RegistrationMailURL      string        // Optional external URL for registration mail service
 	RegistrationMailCallback string        // Callback URL for registration email verification
 	RecoveryMailURL          string        // Optional external URL for recovery mail service
@@ -53,6 +54,7 @@ func Load() *Config {
 		RateLimitWindow:          getEnvDuration("RATE_LIMIT_WINDOW", 15*time.Minute),
 		AuthRateLimit:            getEnvInt("AUTH_RATE_LIMIT", 5),
 		RefreshRateLimit:         getEnvInt("REFRESH_RATE_LIMIT", 30),
+		EnableDebugCoverage:      getEnvBool("ENABLE_DEBUG_COVERAGE", false),
 		RegistrationMailURL:      getEnv("REGISTRATION_MAIL_URL", ""),
 		RegistrationMailCallback: getEnv("REGISTRATION_MAIL_CALLBACK_URL", ""),
 		RecoveryMailURL:          getEnv("RECOVERY_MAIL_URL", ""),
@@ -125,6 +127,20 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
+		return defaultValue
+	}
+	return parsed
+}
+
+// getEnvBool retrieves a boolean environment variable or returns a default when unset/invalid.
+func getEnvBool(key string, defaultValue bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
 		return defaultValue
 	}
 	return parsed
