@@ -3,6 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +18,12 @@ import (
 	"userservice/middleware"
 	"userservice/models"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func newTestHandler(t *testing.T) (*Handler, sqlmock.Sqlmock, *echo.Echo) {
 	db, mock, err := sqlmock.New()
@@ -222,12 +230,16 @@ func TestRegister_WithMailService_Success(t *testing.T) {
 
 	e := echo.New()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mailServiceURL := "http://mail.service/register"
+	mockTransport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		}
+		if r.URL.String() != mailServiceURL {
+			t.Errorf("Expected request URL %s, got %s", mailServiceURL, r.URL.String())
 		}
 
 		var reqBody models.RegistrationMailRequest
@@ -246,9 +258,12 @@ func TestRegister_WithMailService_Success(t *testing.T) {
 			t.Errorf("Expected callback URL, got %s", reqBody.Callback)
 		}
 
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     make(http.Header),
+		}, nil
+	})
 
 	h := New(db, &config.Config{
 		JWTSecret:                "test-secret-key",
@@ -257,9 +272,10 @@ func TestRegister_WithMailService_Success(t *testing.T) {
 		RateLimit:                100,
 		RateLimitWindow:          15 * time.Minute,
 		AuthRateLimit:            5,
-		RegistrationMailURL:      server.URL,
+		RegistrationMailURL:      mailServiceURL,
 		RegistrationMailCallback: "http://localhost:8080/v1/auth/verify-registration",
 	})
+	h.httpClient = &http.Client{Transport: mockTransport}
 
 	mock.ExpectQuery("SELECT COUNT").WithArgs("testuser", "test@example.com").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
@@ -292,10 +308,14 @@ func TestRegister_WithMailService_Failure(t *testing.T) {
 
 	e := echo.New()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer server.Close()
+	mailServiceURL := "http://mail.service/register"
+	mockTransport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     make(http.Header),
+		}, nil
+	})
 
 	h := New(db, &config.Config{
 		JWTSecret:                "test-secret-key",
@@ -304,9 +324,10 @@ func TestRegister_WithMailService_Failure(t *testing.T) {
 		RateLimit:                100,
 		RateLimitWindow:          15 * time.Minute,
 		AuthRateLimit:            5,
-		RegistrationMailURL:      server.URL,
+		RegistrationMailURL:      mailServiceURL,
 		RegistrationMailCallback: "http://localhost:8080/v1/auth/verify-registration",
 	})
+	h.httpClient = &http.Client{Transport: mockTransport}
 
 	mock.ExpectQuery("SELECT COUNT").WithArgs("testuser", "test@example.com").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
@@ -1094,12 +1115,16 @@ func TestPasswordRecovery_ValidEmail_WithMailService(t *testing.T) {
 
 	e := echo.New()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mailServiceURL := "http://mail.service/recovery"
+	mockTransport := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("Expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
+		}
+		if r.URL.String() != mailServiceURL {
+			t.Errorf("Expected request URL %s, got %s", mailServiceURL, r.URL.String())
 		}
 
 		var reqBody models.RecoveryMailRequest
@@ -1115,9 +1140,12 @@ func TestPasswordRecovery_ValidEmail_WithMailService(t *testing.T) {
 			t.Errorf("Expected callback URL, got %s", reqBody.Callback)
 		}
 
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("")),
+			Header:     make(http.Header),
+		}, nil
+	})
 
 	h := New(db, &config.Config{
 		JWTSecret:            "test-secret-key",
@@ -1126,9 +1154,10 @@ func TestPasswordRecovery_ValidEmail_WithMailService(t *testing.T) {
 		RateLimit:            100,
 		RateLimitWindow:      15 * time.Minute,
 		AuthRateLimit:        5,
-		RecoveryMailURL:      server.URL,
+		RecoveryMailURL:      mailServiceURL,
 		RecoveryMailCallback: "http://localhost:8080/v1/auth/verify-recovery",
 	})
+	h.httpClient = &http.Client{Transport: mockTransport}
 
 	mock.ExpectQuery("SELECT id FROM users").WithArgs("test@example.com").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("user-123"))
@@ -1159,11 +1188,6 @@ func TestPasswordRecovery_InvalidEmail(t *testing.T) {
 
 	e := echo.New()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
 	h := New(db, &config.Config{
 		JWTSecret:            "test-secret-key",
 		JWTExpire:            15 * time.Minute,
@@ -1171,7 +1195,7 @@ func TestPasswordRecovery_InvalidEmail(t *testing.T) {
 		RateLimit:            100,
 		RateLimitWindow:      15 * time.Minute,
 		AuthRateLimit:        5,
-		RecoveryMailURL:      server.URL,
+		RecoveryMailURL:      "http://mail.service/recovery",
 		RecoveryMailCallback: "http://localhost:8080/v1/auth/verify-recovery",
 	})
 
@@ -1218,11 +1242,6 @@ func TestPasswordRecovery_InvalidJSON(t *testing.T) {
 
 	e := echo.New()
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
 	h := New(db, &config.Config{
 		JWTSecret:            "test-secret-key",
 		JWTExpire:            15 * time.Minute,
@@ -1230,7 +1249,7 @@ func TestPasswordRecovery_InvalidJSON(t *testing.T) {
 		RateLimit:            100,
 		RateLimitWindow:      15 * time.Minute,
 		AuthRateLimit:        5,
-		RecoveryMailURL:      server.URL,
+		RecoveryMailURL:      "http://mail.service/recovery",
 		RecoveryMailCallback: "http://localhost:8080/v1/auth/verify-recovery",
 	})
 
@@ -1827,5 +1846,234 @@ func TestResetPassword_MissingToken(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("ResetPassword() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRefresh_InvalidJSON(t *testing.T) {
+	h, _, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/refresh", strings.NewReader("invalid"))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	h.Refresh(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Refresh() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRefresh_UserStatusQueryError(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/refresh", strings.NewReader(`{"refreshToken":"valid-token"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mock.ExpectQuery("SELECT id, user_id, expires_at").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "expires_at"}).AddRow("token-id", "user-123", time.Now().Add(time.Hour)))
+	mock.ExpectQuery("SELECT disabled FROM users").WillReturnError(errors.New("db unavailable"))
+
+	h.Refresh(c)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("Refresh() status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestRefresh_DeleteOldTokenError(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/refresh", strings.NewReader(`{"refreshToken":"valid-token"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mock.ExpectQuery("SELECT id, user_id, expires_at").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "expires_at"}).AddRow("token-id", "user-123", time.Now().Add(time.Hour)))
+	mock.ExpectQuery("SELECT disabled FROM users").WillReturnRows(sqlmock.NewRows([]string{"disabled"}).AddRow(false))
+	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
+	mock.ExpectExec("DELETE FROM refresh_tokens").WillReturnError(errors.New("delete failed"))
+
+	h.Refresh(c)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("Refresh() status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestListUsers_CountError(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/admin/users", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mock.ExpectQuery("SELECT COUNT").WillReturnError(errors.New("count failed"))
+
+	h.ListUsers(c)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("ListUsers() status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestListUsers_PaginationIncludesNextLink(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/admin/users?page=2&pageSize=1", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	mock.ExpectQuery("SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+	now := time.Now()
+	mock.ExpectQuery("SELECT id, username, email, email_verified, disabled, created_at, updated_at FROM users").
+		WithArgs(1, 1).
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "disabled", "created_at", "updated_at"}).
+				AddRow("user-123", "testuser", "test@example.com", true, false, now, now),
+		)
+	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
+	mock.ExpectQuery("SELECT data FROM user_misc").WillReturnError(sql.ErrNoRows)
+
+	if err := h.ListUsers(c); err != nil {
+		t.Errorf("ListUsers() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ListUsers() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp models.UserListResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if resp.Page != 2 {
+		t.Errorf("ListUsers() page = %d, want 2", resp.Page)
+	}
+	if resp.PageSize != 1 {
+		t.Errorf("ListUsers() pageSize = %d, want 1", resp.PageSize)
+	}
+	hasNext := false
+	for _, link := range resp.Links {
+		if link.Rel == "next" {
+			hasNext = true
+			break
+		}
+	}
+	if !hasNext {
+		t.Errorf("ListUsers() links = %+v, expected next link", resp.Links)
+	}
+}
+
+func TestUpdateUser_InvalidJSON(t *testing.T) {
+	h, _, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPut, "/v1/admin/users/user-123", strings.NewReader("invalid"))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
+
+	h.UpdateUser(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("UpdateUser() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateUser_InvalidEmail(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPut, "/v1/admin/users/user-123", strings.NewReader(`{"email":"invalid-email"}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
+
+	mock.ExpectQuery("SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	h.UpdateUser(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("UpdateUser() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateUser_InvalidRole(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPut, "/v1/admin/users/user-123", strings.NewReader(`{"roles":["superadmin"]}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
+
+	mock.ExpectQuery("SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	h.UpdateUser(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("UpdateUser() status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateUser_RolesOnly_Success(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	req := httptest.NewRequest(http.MethodPut, "/v1/admin/users/user-123", strings.NewReader(`{"roles":["admin","user"]}`))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.SetParamNames("id")
+	c.SetParamValues("user-123")
+
+	mock.ExpectQuery("SELECT COUNT").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+	mock.ExpectExec("DELETE FROM user_roles").WithArgs("user-123").WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec("INSERT INTO user_roles").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO user_roles").WillReturnResult(sqlmock.NewResult(0, 1))
+
+	now := time.Now()
+	mock.ExpectQuery("SELECT id, username, email, email_verified, disabled, created_at, updated_at FROM users WHERE id = ?").
+		WithArgs("user-123").
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "disabled", "created_at", "updated_at"}).
+				AddRow("user-123", "testuser", "test@example.com", true, false, now, now),
+		)
+	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(
+		sqlmock.NewRows([]string{"role"}).AddRow("admin").AddRow("user"),
+	)
+	mock.ExpectQuery("SELECT data FROM user_misc").WillReturnError(sql.ErrNoRows)
+
+	if err := h.UpdateUser(c); err != nil {
+		t.Errorf("UpdateUser() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("UpdateUser() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp models.AdminUser
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+
+	if len(resp.Roles) != 2 {
+		t.Errorf("UpdateUser() roles = %v, want 2 roles", resp.Roles)
 	}
 }
