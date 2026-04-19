@@ -178,8 +178,8 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	if cfg.JWTAlgorithm != "RS256" {
 		t.Errorf("JWTAlgorithm = %s, want RS256", cfg.JWTAlgorithm)
 	}
-	if cfg.JWTSecret != "test-secret-from-env" {
-		t.Errorf("JWTSecret = %s, want test-secret-from-env", cfg.JWTSecret)
+	if cfg.JWTSecret != "" {
+		t.Errorf("JWTSecret = %q, want empty for RS256", cfg.JWTSecret)
 	}
 	if cfg.JWTPrivateKey != "private-key-from-env" {
 		t.Errorf("JWTPrivateKey = %s, want private-key-from-env", cfg.JWTPrivateKey)
@@ -437,6 +437,34 @@ func TestLoad_HS256MissingSecretReturnsError(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() error = nil, want non-nil")
+	}
+}
+
+func TestLoad_HS256IgnoresMissingAsymmetricKeyFiles(t *testing.T) {
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Setenv("JWT_SECRET", "test-secret")
+	os.Setenv("JWT_PRIVATE_KEY_FILE", "/nonexistent/jwt_private.pem")
+	os.Setenv("JWT_PUBLIC_KEY_FILE", "/nonexistent/jwt_public.pem")
+	defer os.Unsetenv("JWT_ALGORITHM")
+	defer os.Unsetenv("JWT_SECRET")
+	defer os.Unsetenv("JWT_PRIVATE_KEY_FILE")
+	defer os.Unsetenv("JWT_PUBLIC_KEY_FILE")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.JWTAlgorithm != "HS256" {
+		t.Errorf("JWTAlgorithm = %s, want HS256", cfg.JWTAlgorithm)
+	}
+	if cfg.JWTSecret != "test-secret" {
+		t.Errorf("JWTSecret = %s, want test-secret", cfg.JWTSecret)
+	}
+	if cfg.JWTPrivateKey != "" {
+		t.Errorf("JWTPrivateKey = %q, want empty", cfg.JWTPrivateKey)
+	}
+	if cfg.JWTPublicKey != "" {
+		t.Errorf("JWTPublicKey = %q, want empty", cfg.JWTPublicKey)
 	}
 }
 

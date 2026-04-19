@@ -47,19 +47,27 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	jwtSecret, err := getJWTSecret()
-	if err != nil {
-		return nil, err
-	}
+	var jwtSecret string
+	var jwtPrivateKey string
+	var jwtPublicKey string
 
-	jwtPrivateKey, err := getJWTPrivateKey()
-	if err != nil {
-		return nil, err
-	}
-
-	jwtPublicKey, err := getJWTPublicKey()
-	if err != nil {
-		return nil, err
+	switch jwtAlgorithm {
+	case "HS256":
+		jwtSecret, err = getJWTSecret()
+		if err != nil {
+			return nil, err
+		}
+	case "RS256", "ES256":
+		jwtPrivateKey, err = getJWTPrivateKey()
+		if err != nil {
+			return nil, err
+		}
+		jwtPublicKey, err = getJWTPublicKey()
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("invalid JWT_ALGORITHM %q: must be HS256, RS256, or ES256", jwtAlgorithm)
 	}
 
 	cfg := &Config{
