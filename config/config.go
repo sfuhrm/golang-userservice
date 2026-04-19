@@ -113,10 +113,11 @@ func getDBPassword() string {
 }
 
 // getJWTAlgorithm reads and validates JWT_ALGORITHM from environment.
+// If unset, HS256 is used as the default algorithm.
 func getJWTAlgorithm() (string, error) {
 	rawAlgorithm := strings.TrimSpace(os.Getenv("JWT_ALGORITHM"))
 	if rawAlgorithm == "" {
-		return "", fmt.Errorf("JWT_ALGORITHM must be set to one of HS256, RS256, or ES256")
+		return "HS256", nil
 	}
 
 	algorithm := strings.ToUpper(rawAlgorithm)

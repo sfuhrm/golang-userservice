@@ -14,7 +14,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("DB_PASSWORD")
 	os.Unsetenv("DB_PASSWORD_FILE")
 	os.Unsetenv("DB_NAME")
-	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Unsetenv("JWT_ALGORITHM")
 	os.Setenv("JWT_SECRET", "test-secret")
 	os.Unsetenv("JWT_SECRET_FILE")
 	os.Unsetenv("JWT_PRIVATE_KEY")
@@ -34,7 +34,6 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 	os.Unsetenv("RECOVERY_MAIL_URL")
 	os.Unsetenv("RECOVERY_MAIL_CALLBACK_URL")
-	defer os.Unsetenv("JWT_ALGORITHM")
 	defer os.Unsetenv("JWT_SECRET")
 
 	cfg, err := Load()
@@ -415,14 +414,17 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	}
 }
 
-func TestLoad_JWTAlgorithmMissingReturnsError(t *testing.T) {
+func TestLoad_JWTAlgorithmMissingDefaultsToHS256(t *testing.T) {
 	os.Unsetenv("JWT_ALGORITHM")
 	os.Setenv("JWT_SECRET", "test-secret")
 	defer os.Unsetenv("JWT_SECRET")
 
-	_, err := Load()
-	if err == nil {
-		t.Fatal("Load() error = nil, want non-nil")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.JWTAlgorithm != "HS256" {
+		t.Errorf("JWTAlgorithm = %s, want HS256", cfg.JWTAlgorithm)
 	}
 }
 
