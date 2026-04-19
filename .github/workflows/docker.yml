@@ -89,6 +89,7 @@ jobs:
 
       - name: Create JWT RSA key pair
         run: |
+          mkdir -p secrets
           openssl genrsa -out secrets/jwt_private.pem 2048
           openssl rsa -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
 
