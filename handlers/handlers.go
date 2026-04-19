@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -1144,33 +1143,23 @@ func (h *Handler) UpdateUser(c echo.Context) error {
 		}
 	}
 
-	setClauses := []string{}
-	args := []interface{}{}
-
-	if req.Username != nil {
-		setClauses = append(setClauses, "username = ?")
-		args = append(args, *req.Username)
-	}
-	if req.Email != nil {
-		setClauses = append(setClauses, "email = ?")
-		args = append(args, *req.Email)
-	}
-	if req.EmailVerified != nil {
-		setClauses = append(setClauses, "email_verified = ?")
-		args = append(args, *req.EmailVerified)
-	}
-	if req.Disabled != nil {
-		setClauses = append(setClauses, "disabled = ?")
-		args = append(args, *req.Disabled)
-	}
-
-	if len(setClauses) > 0 {
-		setClauses = append(setClauses, "updated_at = ?")
-		args = append(args, time.Now())
-		args = append(args, userID)
-
-		query := "UPDATE users SET " + strings.Join(setClauses, ", ") + " WHERE id = ?"
-		_, err = h.db.Exec(query, args...)
+	shouldUpdateUser := req.Username != nil || req.Email != nil || req.EmailVerified != nil || req.Disabled != nil
+	if shouldUpdateUser {
+		_, err = h.db.Exec(
+			`UPDATE users
+			SET username = COALESCE(?, username),
+			    email = COALESCE(?, email),
+			    email_verified = COALESCE(?, email_verified),
+			    disabled = COALESCE(?, disabled),
+			    updated_at = ?
+			WHERE id = ?`,
+			req.Username,
+			req.Email,
+			req.EmailVerified,
+			req.Disabled,
+			time.Now(),
+			userID,
+		)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 				Code:    "INTERNAL_ERROR",

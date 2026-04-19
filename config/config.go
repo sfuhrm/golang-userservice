@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -106,11 +107,8 @@ func Load() (*Config, error) {
 // getDBPassword reads the DB password from a file or environment variable.
 // Priority: 1) DB_PASSWORD_FILE env var (path to secret file), 2) DB_PASSWORD env var, 3) default
 func getDBPassword() string {
-	if passwordFile := os.Getenv("DB_PASSWORD_FILE"); passwordFile != "" {
-		password, err := os.ReadFile(passwordFile)
-		if err == nil {
-			return strings.TrimSpace(string(password))
-		}
+	if password, err := readSecretFromFile("DB_PASSWORD_FILE"); err == nil && password != "" {
+		return password
 	}
 
 	if password := os.Getenv("DB_PASSWORD"); password != "" {
@@ -140,12 +138,10 @@ func getJWTAlgorithm() (string, error) {
 // getJWTSecret reads the JWT secret from a file or environment variable.
 // Priority: 1) JWT_SECRET_FILE env var (path to secret file), 2) JWT_SECRET env var
 func getJWTSecret() (string, error) {
-	if secretFile := os.Getenv("JWT_SECRET_FILE"); secretFile != "" {
-		secret, err := os.ReadFile(secretFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to read JWT_SECRET_FILE %q: %w", secretFile, err)
-		}
-		return strings.TrimSpace(string(secret)), nil
+	if secret, err := readSecretFromFile("JWT_SECRET_FILE"); err != nil {
+		return "", err
+	} else if secret != "" {
+		return secret, nil
 	}
 
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
@@ -158,12 +154,10 @@ func getJWTSecret() (string, error) {
 // getJWTPrivateKey reads the private key from a file or environment variable.
 // Priority: 1) JWT_PRIVATE_KEY_FILE env var, 2) JWT_PRIVATE_KEY env var, 3) empty
 func getJWTPrivateKey() (string, error) {
-	if keyFile := os.Getenv("JWT_PRIVATE_KEY_FILE"); keyFile != "" {
-		key, err := os.ReadFile(keyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to read JWT_PRIVATE_KEY_FILE %q: %w", keyFile, err)
-		}
-		return strings.TrimSpace(string(key)), nil
+	if key, err := readSecretFromFile("JWT_PRIVATE_KEY_FILE"); err != nil {
+		return "", err
+	} else if key != "" {
+		return key, nil
 	}
 
 	if key := os.Getenv("JWT_PRIVATE_KEY"); key != "" {
@@ -176,12 +170,10 @@ func getJWTPrivateKey() (string, error) {
 // getJWTPublicKey reads the public key from a file or environment variable.
 // Priority: 1) JWT_PUBLIC_KEY_FILE env var, 2) JWT_PUBLIC_KEY env var, 3) empty
 func getJWTPublicKey() (string, error) {
-	if keyFile := os.Getenv("JWT_PUBLIC_KEY_FILE"); keyFile != "" {
-		key, err := os.ReadFile(keyFile)
-		if err != nil {
-			return "", fmt.Errorf("failed to read JWT_PUBLIC_KEY_FILE %q: %w", keyFile, err)
-		}
-		return strings.TrimSpace(string(key)), nil
+	if key, err := readSecretFromFile("JWT_PUBLIC_KEY_FILE"); err != nil {
+		return "", err
+	} else if key != "" {
+		return key, nil
 	}
 
 	if key := os.Getenv("JWT_PUBLIC_KEY"); key != "" {
@@ -256,4 +248,32 @@ func getEnvBool(key string, defaultValue bool) bool {
 		return defaultValue
 	}
 	return parsed
+}
+
+func readSecretFromFile(envVar string) (string, error) {
+	filePath := strings.TrimSpace(os.Getenv(envVar))
+	if filePath == "" {
+		return "", nil
+	}
+
+	cleanPath := filepath.Clean(filePath)
+	if !filepath.IsAbs(cleanPath) {
+		return "", fmt.Errorf("%s must be an absolute path", envVar)
+	}
+
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s %q: %w", envVar, cleanPath, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("failed to read %s %q: path is a directory", envVar, cleanPath)
+	}
+
+	// #nosec G304 -- path comes from operator-controlled env var and is validated as an absolute file path.
+	secret, err := os.ReadFile(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s %q: %w", envVar, cleanPath, err)
+	}
+
+	return strings.TrimSpace(string(secret)), nil
 }
