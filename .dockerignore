@@ -1,0 +1,36 @@
+# Keep Docker build context minimal and free of local/secrets artifacts.
+
+# VCS and CI metadata
+.git
+.github
+
+# Local tooling/editor artifacts
+.codex
+.idea
+.vscode
+
+# Secrets and local env files
+secrets/
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+# Build/test outputs
+userservice
+coverage.out
+unit_coverage.out
+*.test
+*.out
+
+# Local development and docs not required for image build
+docker-compose*.yml
+tests/
+**/*_test.go
+README.md
+LICENSE.md
+
+# OS cruft
+.DS_Store
+Thumbs.db
