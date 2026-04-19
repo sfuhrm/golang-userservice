@@ -24,7 +24,10 @@ import (
 //   - Registers API routes for user and authentication endpoints
 //   - Starts the HTTP server on the configured port
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
 	db, err := database.Connect(cfg)
 	if err != nil {

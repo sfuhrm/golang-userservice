@@ -14,8 +14,8 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("DB_PASSWORD")
 	os.Unsetenv("DB_PASSWORD_FILE")
 	os.Unsetenv("DB_NAME")
-	os.Unsetenv("JWT_ALGORITHM")
-	os.Unsetenv("JWT_SECRET")
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Setenv("JWT_SECRET", "test-secret")
 	os.Unsetenv("JWT_SECRET_FILE")
 	os.Unsetenv("JWT_PRIVATE_KEY")
 	os.Unsetenv("JWT_PRIVATE_KEY_FILE")
@@ -34,8 +34,13 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("REGISTRATION_MAIL_CALLBACK_URL")
 	os.Unsetenv("RECOVERY_MAIL_URL")
 	os.Unsetenv("RECOVERY_MAIL_CALLBACK_URL")
+	defer os.Unsetenv("JWT_ALGORITHM")
+	defer os.Unsetenv("JWT_SECRET")
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.ServerPort != "8080" {
 		t.Errorf("ServerPort = %s, want 8080", cfg.ServerPort)
@@ -148,7 +153,10 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("RECOVERY_MAIL_CALLBACK_URL")
 	}()
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.ServerPort != "9090" {
 		t.Errorf("ServerPort = %s, want 9090", cfg.ServerPort)
@@ -229,7 +237,13 @@ func TestLoad_JWTSecretFromFile(t *testing.T) {
 	os.Unsetenv("JWT_SECRET")
 	defer os.Unsetenv("JWT_SECRET_FILE")
 
-	cfg := Load()
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	defer os.Unsetenv("JWT_ALGORITHM")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.JWTSecret != "secret-from-file" {
 		t.Errorf("JWTSecret = %s, want secret-from-file", cfg.JWTSecret)
@@ -246,10 +260,15 @@ func TestLoad_JWTKeysFromFile(t *testing.T) {
 	os.Setenv("JWT_PUBLIC_KEY_FILE", "/tmp/test_jwt_public.pem")
 	os.Unsetenv("JWT_PRIVATE_KEY")
 	os.Unsetenv("JWT_PUBLIC_KEY")
+	os.Setenv("JWT_ALGORITHM", "RS256")
 	defer os.Unsetenv("JWT_PRIVATE_KEY_FILE")
 	defer os.Unsetenv("JWT_PUBLIC_KEY_FILE")
+	defer os.Unsetenv("JWT_ALGORITHM")
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.JWTPrivateKey != "private-key-from-file" {
 		t.Errorf("JWTPrivateKey = %s, want private-key-from-file", cfg.JWTPrivateKey)
@@ -268,7 +287,15 @@ func TestLoad_DBPasswordFromFile(t *testing.T) {
 	defer os.Unsetenv("DB_PASSWORD_FILE")
 	defer os.Unsetenv("DB_PASSWORD")
 
-	cfg := Load()
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Setenv("JWT_SECRET", "test-secret")
+	defer os.Unsetenv("JWT_ALGORITHM")
+	defer os.Unsetenv("JWT_SECRET")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.DBPassword != "db-pass-from-file" {
 		t.Errorf("DBPassword = %s, want db-pass-from-file", cfg.DBPassword)
@@ -281,7 +308,15 @@ func TestLoad_DBPasswordFileNotFoundFallsBackToEnv(t *testing.T) {
 	defer os.Unsetenv("DB_PASSWORD_FILE")
 	defer os.Unsetenv("DB_PASSWORD")
 
-	cfg := Load()
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Setenv("JWT_SECRET", "test-secret")
+	defer os.Unsetenv("JWT_ALGORITHM")
+	defer os.Unsetenv("JWT_SECRET")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.DBPassword != "db-pass-from-env" {
 		t.Errorf("DBPassword = %s, want db-pass-from-env", cfg.DBPassword)
@@ -291,33 +326,41 @@ func TestLoad_DBPasswordFileNotFoundFallsBackToEnv(t *testing.T) {
 func TestLoad_JWTSecretFileNotFound(t *testing.T) {
 	os.Setenv("JWT_SECRET_FILE", "/nonexistent/secret.txt")
 	os.Unsetenv("JWT_SECRET")
+	os.Setenv("JWT_ALGORITHM", "HS256")
 	defer os.Unsetenv("JWT_SECRET_FILE")
+	defer os.Unsetenv("JWT_ALGORITHM")
 
-	cfg := Load()
-
-	if cfg.JWTSecret == "" {
-		t.Error("JWTSecret should not be empty when file not found")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want non-nil")
 	}
-	if cfg.JWTSecret != "your-secret-key-change-in-production" {
-		t.Errorf("JWTSecret = %s, want default", cfg.JWTSecret)
+	if err.Error() == "" {
+		t.Fatal("Load() should return a descriptive error message")
 	}
 }
 
-func TestLoad_JWTAlgorithmInvalidFallsBackToDefault(t *testing.T) {
+func TestLoad_JWTAlgorithmInvalidReturnsError(t *testing.T) {
 	os.Setenv("JWT_ALGORITHM", "invalid")
 	defer os.Unsetenv("JWT_ALGORITHM")
+	os.Setenv("JWT_SECRET", "test-secret")
+	defer os.Unsetenv("JWT_SECRET")
 
-	cfg := Load()
-	if cfg.JWTAlgorithm != "HS256" {
-		t.Errorf("JWTAlgorithm = %s, want HS256", cfg.JWTAlgorithm)
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want non-nil")
 	}
 }
 
 func TestLoad_JWTAlgorithmES256(t *testing.T) {
 	os.Setenv("JWT_ALGORITHM", "es256")
+	os.Setenv("JWT_PRIVATE_KEY", "private-key-from-env")
 	defer os.Unsetenv("JWT_ALGORITHM")
+	defer os.Unsetenv("JWT_PRIVATE_KEY")
 
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 	if cfg.JWTAlgorithm != "ES256" {
 		t.Errorf("JWTAlgorithm = %s, want ES256", cfg.JWTAlgorithm)
 	}
@@ -339,7 +382,15 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	defer os.Unsetenv("REFRESH_EXPIRE")
 	defer os.Unsetenv("ENABLE_DEBUG_COVERAGE")
 
-	cfg := Load()
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Setenv("JWT_SECRET", "test-secret")
+	defer os.Unsetenv("JWT_ALGORITHM")
+	defer os.Unsetenv("JWT_SECRET")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
 	if cfg.RateLimit != 100 {
 		t.Errorf("RateLimit = %d, want default 100", cfg.RateLimit)
@@ -361,6 +412,29 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	}
 	if cfg.EnableDebugCoverage {
 		t.Errorf("EnableDebugCoverage = %v, want default false", cfg.EnableDebugCoverage)
+	}
+}
+
+func TestLoad_JWTAlgorithmMissingReturnsError(t *testing.T) {
+	os.Unsetenv("JWT_ALGORITHM")
+	os.Setenv("JWT_SECRET", "test-secret")
+	defer os.Unsetenv("JWT_SECRET")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want non-nil")
+	}
+}
+
+func TestLoad_HS256MissingSecretReturnsError(t *testing.T) {
+	os.Setenv("JWT_ALGORITHM", "HS256")
+	os.Unsetenv("JWT_SECRET")
+	os.Unsetenv("JWT_SECRET_FILE")
+	defer os.Unsetenv("JWT_ALGORITHM")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want non-nil")
 	}
 }
 
