@@ -84,10 +84,10 @@ func verifyArgon2idHash(password, encodedHash string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if len(hash) == 0 {
+	if len(hash) != int(argon2KeyLength) {
 		return false, errors.New("invalid argon2id hash length")
 	}
 
-	calculated := argon2.IDKey([]byte(password), salt, iterations, memoryKiB, parallelism, uint32(len(hash)))
+	calculated := argon2.IDKey([]byte(password), salt, iterations, memoryKiB, parallelism, argon2KeyLength)
 	return subtle.ConstantTimeCompare(hash, calculated) == 1, nil
 }
