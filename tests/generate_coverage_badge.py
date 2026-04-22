@@ -10,9 +10,9 @@ UNIT_COVERAGE_ENV = os.getenv("UNIT_COVERAGE")
 
 def get_color(percentage):
     if percentage >= 80:
-        return "brightgreen"
+        return "green"
     if percentage >= 60:
-        return "yellow"
+        return "gold"
     if percentage >= 40:
         return "orange"
     return "red"
