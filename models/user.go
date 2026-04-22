@@ -29,7 +29,7 @@ type User struct {
 	ID            string    `json:"id"`            // Unique user identifier (UUID)
 	Username      string    `json:"username"`      // Unique username
 	Email         string    `json:"email"`         // Unique email address
-	PasswordHash  string    `json:"-"`             // Bcrypt password hash (never exposed)
+	PasswordHash  string    `json:"-"`             // Password hash (legacy bcrypt or Argon2id, never exposed)
 	EmailVerified bool      `json:"emailVerified"` // Email verification status
 	Disabled      bool      `json:"disabled"`      // Whether the user account is disabled
 	CreatedAt     time.Time `json:"createdAt"`     // Account creation timestamp

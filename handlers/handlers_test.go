@@ -406,6 +406,43 @@ func TestLogin_Success(t *testing.T) {
 	}
 }
 
+func TestLogin_Success_WithArgon2idHash(t *testing.T) {
+	h, mock, e := newTestHandler(t)
+	defer h.db.Close()
+
+	passwordHash, err := hashPassword("password123")
+	if err != nil {
+		t.Fatalf("hashPassword() error = %v", err)
+	}
+	reqBody := `{"email":"test@example.com","password":"password123"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(reqBody))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	rows := sqlmock.NewRows([]string{"id", "username", "email", "password_hash", "email_verified", "disabled", "created_at", "updated_at"}).
+		AddRow("user-123", "testuser", "test@example.com", passwordHash, true, false, time.Now(), time.Now())
+	mock.ExpectQuery("SELECT id, username, email, password_hash").WithArgs("test@example.com").WillReturnRows(rows)
+	mock.ExpectQuery("SELECT role FROM user_roles").WillReturnRows(sqlmock.NewRows([]string{"role"}).AddRow("user"))
+	mock.ExpectQuery("SELECT NEXT VALUE FOR jwt_jti_seq").WillReturnRows(sqlmock.NewRows([]string{"next_value"}).AddRow(1))
+	mock.ExpectExec("INSERT INTO refresh_tokens").WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery("SELECT id, username, email, email_verified, created_at, updated_at FROM users WHERE id = ?").
+		WithArgs("user-123").
+		WillReturnRows(
+			sqlmock.NewRows([]string{"id", "username", "email", "email_verified", "created_at", "updated_at"}).
+				AddRow("user-123", "testuser", "test@example.com", true, time.Now(), time.Now()),
+		)
+
+	if err := h.Login(c); err != nil {
+		t.Errorf("Login() error = %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Login() status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
 func TestLogin_InvalidJSON(t *testing.T) {
 	h, _, e := newTestHandler(t)
 	defer h.db.Close()

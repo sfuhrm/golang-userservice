@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/bcrypt"
 	"userservice/config"
 	"userservice/middleware"
 	"userservice/models"
@@ -159,7 +158,7 @@ func (h *Handler) Register(c echo.Context) error {
 		})
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	passwordHash, err := hashPassword(req.Password)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "INTERNAL_ERROR",
@@ -172,7 +171,7 @@ func (h *Handler) Register(c echo.Context) error {
 
 	_, err = h.db.Exec(
 		"INSERT INTO users (id, username, email, password_hash, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		userID, req.Username, req.Email, string(passwordHash), false, now, now,
+		userID, req.Username, req.Email, passwordHash, false, now, now,
 	)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -256,7 +255,7 @@ func (h *Handler) Login(c echo.Context) error {
 		})
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err := verifyPasswordHash(user.PasswordHash, req.Password); err != nil {
 		return c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Code:    "INVALID_CREDENTIALS",
 			Message: "Invalid email or password",
@@ -630,14 +629,14 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 		})
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+	if err := verifyPasswordHash(currentHash, req.CurrentPassword); err != nil {
 		return c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Code:    "INVALID_PASSWORD",
 			Message: "Current password is incorrect",
 		})
 	}
 
-	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	newHash, err := hashPassword(req.NewPassword)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "INTERNAL_ERROR",
@@ -645,7 +644,7 @@ func (h *Handler) ChangePassword(c echo.Context) error {
 		})
 	}
 
-	_, err = h.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", string(newHash), time.Now(), userID)
+	_, err = h.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", newHash, time.Now(), userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "INTERNAL_ERROR",
@@ -839,7 +838,7 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 		})
 	}
 
-	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	newHash, err := hashPassword(req.NewPassword)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "INTERNAL_ERROR",
@@ -848,7 +847,7 @@ func (h *Handler) ResetPassword(c echo.Context) error {
 	}
 
 	now := time.Now()
-	_, err = h.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", string(newHash), now, tokenRecord.UserID)
+	_, err = h.db.Exec("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?", newHash, now, tokenRecord.UserID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Code:    "INTERNAL_ERROR",
