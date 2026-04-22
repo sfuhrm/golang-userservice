@@ -20,10 +20,10 @@ type Config struct {
 	DBUser                   string        // Database username (default: userservice)
 	DBPassword               string        // Database password (default: userservice)
 	DBName                   string        // Database name (default: userservice)
-	JWTAlgorithm             string        // JWT signing algorithm: HS256, RS256, or ES256
-	JWTSecret                string        // Secret key for HS256 JWT tokens
-	JWTPrivateKey            string        // Private key PEM for RS256/ES256 token signing
-	JWTPublicKey             string        // Public key PEM for RS256/ES256 token verification
+	JWTAlgorithm             string        // JWT signing algorithm: HS*, RS*, or ES* variants (256/384/512)
+	JWTSecret                string        // Secret key for HS* JWT tokens
+	JWTPrivateKey            string        // Private key PEM for RS*/ES* token signing
+	JWTPublicKey             string        // Public key PEM for RS*/ES* token verification
 	JWTIssuer                string        // Optional JWT issuer claim (iss)
 	JWTAudience              string        // Optional JWT audience claim (aud)
 	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
@@ -52,13 +52,13 @@ func Load() (*Config, error) {
 	var jwtPrivateKey string
 	var jwtPublicKey string
 
-	switch jwtAlgorithm {
-	case "HS256":
+	switch {
+	case isHMACJWTAlgorithm(jwtAlgorithm):
 		jwtSecret, err = getJWTSecret()
 		if err != nil {
 			return nil, err
 		}
-	case "RS256", "ES256":
+	case isRSAJWTAlgorithm(jwtAlgorithm), isECDSAJWTAlgorithm(jwtAlgorithm):
 		jwtPrivateKey, err = getJWTPrivateKey()
 		if err != nil {
 			return nil, err
@@ -68,7 +68,7 @@ func Load() (*Config, error) {
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("invalid JWT_ALGORITHM %q: must be HS256, RS256, or ES256", jwtAlgorithm)
+		return nil, invalidJWTAlgorithmError(jwtAlgorithm)
 	}
 
 	cfg := &Config{
@@ -127,12 +127,10 @@ func getJWTAlgorithm() (string, error) {
 	}
 
 	algorithm := strings.ToUpper(rawAlgorithm)
-	switch algorithm {
-	case "HS256", "RS256", "ES256":
+	if isSupportedJWTAlgorithm(algorithm) {
 		return algorithm, nil
-	default:
-		return "", fmt.Errorf("invalid JWT_ALGORITHM %q: must be HS256, RS256, or ES256", rawAlgorithm)
 	}
+	return "", invalidJWTAlgorithmError(rawAlgorithm)
 }
 
 // getJWTSecret reads the JWT secret from a file or environment variable.
@@ -184,20 +182,58 @@ func getJWTPublicKey() (string, error) {
 }
 
 func validateJWTConfig(cfg *Config) error {
-	switch cfg.JWTAlgorithm {
-	case "HS256":
+	switch {
+	case isHMACJWTAlgorithm(cfg.JWTAlgorithm):
 		if strings.TrimSpace(cfg.JWTSecret) == "" {
-			return fmt.Errorf("JWT_SECRET or JWT_SECRET_FILE must be set when JWT_ALGORITHM=HS256")
+			return fmt.Errorf("JWT_SECRET or JWT_SECRET_FILE must be set when JWT_ALGORITHM=%s", cfg.JWTAlgorithm)
 		}
-	case "RS256", "ES256":
+	case isRSAJWTAlgorithm(cfg.JWTAlgorithm), isECDSAJWTAlgorithm(cfg.JWTAlgorithm):
 		if strings.TrimSpace(cfg.JWTPrivateKey) == "" {
 			return fmt.Errorf("JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_FILE must be set when JWT_ALGORITHM=%s", cfg.JWTAlgorithm)
 		}
 	default:
-		return fmt.Errorf("invalid JWT_ALGORITHM %q: must be HS256, RS256, or ES256", cfg.JWTAlgorithm)
+		return invalidJWTAlgorithmError(cfg.JWTAlgorithm)
 	}
 
 	return nil
+}
+
+func isSupportedJWTAlgorithm(algorithm string) bool {
+	return isHMACJWTAlgorithm(algorithm) || isRSAJWTAlgorithm(algorithm) || isECDSAJWTAlgorithm(algorithm)
+}
+
+func isHMACJWTAlgorithm(algorithm string) bool {
+	switch algorithm {
+	case "HS256", "HS384", "HS512":
+		return true
+	default:
+		return false
+	}
+}
+
+func isRSAJWTAlgorithm(algorithm string) bool {
+	switch algorithm {
+	case "RS256", "RS384", "RS512":
+		return true
+	default:
+		return false
+	}
+}
+
+func isECDSAJWTAlgorithm(algorithm string) bool {
+	switch algorithm {
+	case "ES256", "ES384", "ES512":
+		return true
+	default:
+		return false
+	}
+}
+
+func invalidJWTAlgorithmError(rawAlgorithm string) error {
+	return fmt.Errorf(
+		"invalid JWT_ALGORITHM %q: must be HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, or ES512",
+		rawAlgorithm,
+	)
 }
 
 // getEnv retrieves an environment variable value or returns a default if not set.

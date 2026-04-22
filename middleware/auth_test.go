@@ -40,9 +40,13 @@ func generateRSAKeyPairPEM(t *testing.T) (string, string) {
 }
 
 func generateECDSAKeyPairPEM(t *testing.T) (string, string) {
+	return generateECDSAKeyPairPEMWithCurve(t, elliptic.P256())
+}
+
+func generateECDSAKeyPairPEMWithCurve(t *testing.T, curve elliptic.Curve) (string, string) {
 	t.Helper()
 
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		t.Fatalf("failed to generate private key: %v", err)
 	}
@@ -60,6 +64,59 @@ func generateECDSAKeyPairPEM(t *testing.T) (string, string) {
 	publicPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicDER})
 
 	return string(privatePEM), string(publicPEM)
+}
+
+func testJWTConfigForAlgorithm(t *testing.T, algorithm string) *config.Config {
+	t.Helper()
+
+	cfg := &config.Config{
+		JWTAlgorithm: algorithm,
+		JWTExpire:    15 * time.Minute,
+	}
+
+	switch algorithm {
+	case "HS256", "HS384", "HS512":
+		cfg.JWTSecret = "test-secret"
+	case "RS256", "RS384", "RS512":
+		privateKeyPEM, publicKeyPEM := generateRSAKeyPairPEM(t)
+		cfg.JWTPrivateKey = privateKeyPEM
+		cfg.JWTPublicKey = publicKeyPEM
+	case "ES256":
+		privateKeyPEM, publicKeyPEM := generateECDSAKeyPairPEMWithCurve(t, elliptic.P256())
+		cfg.JWTPrivateKey = privateKeyPEM
+		cfg.JWTPublicKey = publicKeyPEM
+	case "ES384":
+		privateKeyPEM, publicKeyPEM := generateECDSAKeyPairPEMWithCurve(t, elliptic.P384())
+		cfg.JWTPrivateKey = privateKeyPEM
+		cfg.JWTPublicKey = publicKeyPEM
+	case "ES512":
+		privateKeyPEM, publicKeyPEM := generateECDSAKeyPairPEMWithCurve(t, elliptic.P521())
+		cfg.JWTPrivateKey = privateKeyPEM
+		cfg.JWTPublicKey = publicKeyPEM
+	default:
+		t.Fatalf("unsupported test algorithm: %s", algorithm)
+	}
+
+	return cfg
+}
+
+func verificationKeyFuncForConfig(cfg *config.Config) jwt.Keyfunc {
+	switch cfg.JWTAlgorithm {
+	case "HS256", "HS384", "HS512":
+		return func(token *jwt.Token) (interface{}, error) {
+			return []byte(cfg.JWTSecret), nil
+		}
+	case "RS256", "RS384", "RS512":
+		return func(token *jwt.Token) (interface{}, error) {
+			return jwt.ParseRSAPublicKeyFromPEM([]byte(cfg.JWTPublicKey))
+		}
+	case "ES256", "ES384", "ES512":
+		return func(token *jwt.Token) (interface{}, error) {
+			return jwt.ParseECPublicKeyFromPEM([]byte(cfg.JWTPublicKey))
+		}
+	default:
+		return nil
+	}
 }
 
 func TestGenerateAccessToken(t *testing.T) {
@@ -155,6 +212,36 @@ func TestGenerateAccessToken_ES256MissingPrivateKey(t *testing.T) {
 	token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
 	if err == nil {
 		t.Errorf("GenerateAccessToken() error = nil, want non-nil, token = %q", token)
+	}
+}
+
+func TestGenerateAccessToken_AdditionalAlgorithms(t *testing.T) {
+	algorithms := []string{"HS384", "HS512", "RS384", "RS512", "ES384", "ES512"}
+
+	for _, algorithm := range algorithms {
+		t.Run(algorithm, func(t *testing.T) {
+			cfg := testJWTConfigForAlgorithm(t, algorithm)
+			verifyKeyFunc := verificationKeyFuncForConfig(cfg)
+			if verifyKeyFunc == nil {
+				t.Fatalf("missing verification key func for algorithm %s", algorithm)
+			}
+
+			token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+			if err != nil {
+				t.Fatalf("GenerateAccessToken() error = %v", err)
+			}
+			if token == "" {
+				t.Fatal("GenerateAccessToken() should return a non-empty token")
+			}
+
+			parsed, err := jwt.Parse(token, verifyKeyFunc)
+			if err != nil {
+				t.Fatalf("jwt.Parse() error = %v", err)
+			}
+			if parsed.Method.Alg() != algorithm {
+				t.Errorf("token signing method = %s, want %s", parsed.Method.Alg(), algorithm)
+			}
+		})
 	}
 }
 
@@ -584,6 +671,43 @@ func TestJWTAuth_ValidToken_ES256(t *testing.T) {
 	}
 	if rec.Body.String() != "user-123" {
 		t.Errorf("JWTAuth() userID = %s, want user-123", rec.Body.String())
+	}
+}
+
+func TestJWTAuth_ValidToken_AdditionalAlgorithms(t *testing.T) {
+	algorithms := []string{"HS384", "HS512", "RS384", "RS512", "ES384", "ES512"}
+
+	for _, algorithm := range algorithms {
+		t.Run(algorithm, func(t *testing.T) {
+			cfg := testJWTConfigForAlgorithm(t, algorithm)
+
+			token, err := GenerateAccessToken("user-123", []models.UserRole{models.RoleUser}, cfg)
+			if err != nil {
+				t.Fatalf("failed to generate token: %v", err)
+			}
+
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			handler := JWTAuth(cfg)(func(c echo.Context) error {
+				userID := c.Get("userID").(string)
+				return c.String(http.StatusOK, userID)
+			})
+
+			err = handler(c)
+			if err != nil {
+				t.Errorf("JWTAuth() error = %v", err)
+			}
+			if rec.Code != http.StatusOK {
+				t.Errorf("JWTAuth() status = %d, want %d", rec.Code, http.StatusOK)
+			}
+			if rec.Body.String() != "user-123" {
+				t.Errorf("JWTAuth() userID = %s, want user-123", rec.Body.String())
+			}
+		})
 	}
 }
 

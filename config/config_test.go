@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -362,6 +363,40 @@ func TestLoad_JWTAlgorithmES256(t *testing.T) {
 	}
 	if cfg.JWTAlgorithm != "ES256" {
 		t.Errorf("JWTAlgorithm = %s, want ES256", cfg.JWTAlgorithm)
+	}
+}
+
+func TestLoad_JWTAlgorithmAdditionalSupportedValues(t *testing.T) {
+	algorithms := []string{"hs384", "hs512", "rs384", "rs512", "es384", "es512"}
+
+	for _, algorithm := range algorithms {
+		t.Run(strings.ToUpper(algorithm), func(t *testing.T) {
+			os.Setenv("JWT_ALGORITHM", algorithm)
+			defer os.Unsetenv("JWT_ALGORITHM")
+
+			os.Unsetenv("JWT_SECRET")
+			os.Unsetenv("JWT_SECRET_FILE")
+			os.Unsetenv("JWT_PRIVATE_KEY")
+			os.Unsetenv("JWT_PRIVATE_KEY_FILE")
+			os.Unsetenv("JWT_PUBLIC_KEY")
+			os.Unsetenv("JWT_PUBLIC_KEY_FILE")
+
+			if strings.HasPrefix(strings.ToUpper(algorithm), "HS") {
+				os.Setenv("JWT_SECRET", "test-secret")
+				defer os.Unsetenv("JWT_SECRET")
+			} else {
+				os.Setenv("JWT_PRIVATE_KEY", "private-key-from-env")
+				defer os.Unsetenv("JWT_PRIVATE_KEY")
+			}
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if cfg.JWTAlgorithm != strings.ToUpper(algorithm) {
+				t.Errorf("JWTAlgorithm = %s, want %s", cfg.JWTAlgorithm, strings.ToUpper(algorithm))
+			}
+		})
 	}
 }
 

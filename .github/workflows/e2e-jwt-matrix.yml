@@ -17,10 +17,22 @@ jobs:
         jwt:
           - id: hs256
             algorithm: HS256
+          - id: hs384
+            algorithm: HS384
+          - id: hs512
+            algorithm: HS512
           - id: rs256
             algorithm: RS256
+          - id: rs384
+            algorithm: RS384
+          - id: rs512
+            algorithm: RS512
           - id: es256
             algorithm: ES256
+          - id: es384
+            algorithm: ES384
+          - id: es512
+            algorithm: ES512
     env:
       BASE_URL: http://localhost:8080/v1
       COMPOSE_FILE: docker-compose.yml:docker-compose.e2e.override.yml
@@ -45,15 +57,23 @@ jobs:
           mkdir -p secrets
 
           case "$JWT_ALGORITHM" in
-            HS256)
+            HS256|HS384|HS512)
               openssl rand -hex 64 > secrets/jwt_secret.txt
               ;;
-            RS256)
+            RS256|RS384|RS512)
               openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out secrets/jwt_private.pem
               openssl pkey -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
               ;;
             ES256)
               openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out secrets/jwt_private.pem
+              openssl pkey -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
+              ;;
+            ES384)
+              openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-384 -out secrets/jwt_private.pem
+              openssl pkey -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
+              ;;
+            ES512)
+              openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-521 -out secrets/jwt_private.pem
               openssl pkey -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
               ;;
             *)
@@ -69,31 +89,31 @@ jobs:
           set -euo pipefail
 
           case "$JWT_ALGORITHM" in
-            HS256)
-              cat > docker-compose.e2e.override.yml <<'YAML'
+            HS256|HS384|HS512)
+              cat > docker-compose.e2e.override.yml <<YAML
           services:
             app:
               environment:
-                JWT_ALGORITHM: HS256
+                JWT_ALGORITHM: ${JWT_ALGORITHM}
                 JWT_SECRET_FILE: /run/secrets/jwt_secret.txt
           YAML
               ;;
-            RS256)
-              cat > docker-compose.e2e.override.yml <<'YAML'
+            RS256|RS384|RS512)
+              cat > docker-compose.e2e.override.yml <<YAML
           services:
             app:
               environment:
-                JWT_ALGORITHM: RS256
+                JWT_ALGORITHM: ${JWT_ALGORITHM}
                 JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private.pem
                 JWT_PUBLIC_KEY_FILE: /run/secrets/jwt_public.pem
           YAML
               ;;
-            ES256)
-              cat > docker-compose.e2e.override.yml <<'YAML'
+            ES256|ES384|ES512)
+              cat > docker-compose.e2e.override.yml <<YAML
           services:
             app:
               environment:
-                JWT_ALGORITHM: ES256
+                JWT_ALGORITHM: ${JWT_ALGORITHM}
                 JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private.pem
                 JWT_PUBLIC_KEY_FILE: /run/secrets/jwt_public.pem
           YAML
