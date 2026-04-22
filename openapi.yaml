@@ -18,7 +18,7 @@ info:
     Access tokens are JWTs in the format `<base64url(header)>.<base64url(payload)>.<base64url(signature)>`.
 
     * **Header**:
-      * `alg`: `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, or `ES512` (configured by server environment)
+      * `alg`: `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, or `ES512` (configured by server environment)
       * `typ`: `JWT`
     * **Payload Claims**:
       * `sub`: Authenticated user UUID (subject claim)
@@ -28,6 +28,7 @@ info:
     * **Signature**:
       * HS256/HS384/HS512: `HMACSHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_SECRET)`
       * RS256/RS384/RS512: `RSASSA-PKCS1-v1_5-SHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
+      * PS256/PS384/PS512: `RSASSA-PSS-SHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
       * ES256/ES384/ES512: `ECDSA-P(256|384|521)-SHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
 
     JWT payload data is not encrypted, only signed.
@@ -1145,7 +1146,7 @@ components:
         alg:
           type: string
           description: Signing algorithm identifier.
-          enum: [HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, ES512]
+          enum: [HS256, HS384, HS512, RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, ES512]
           example: RS256
         typ:
           type: string

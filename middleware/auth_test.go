@@ -77,7 +77,7 @@ func testJWTConfigForAlgorithm(t *testing.T, algorithm string) *config.Config {
 	switch algorithm {
 	case "HS256", "HS384", "HS512":
 		cfg.JWTSecret = "test-secret"
-	case "RS256", "RS384", "RS512":
+	case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512":
 		privateKeyPEM, publicKeyPEM := generateRSAKeyPairPEM(t)
 		cfg.JWTPrivateKey = privateKeyPEM
 		cfg.JWTPublicKey = publicKeyPEM
@@ -106,7 +106,7 @@ func verificationKeyFuncForConfig(cfg *config.Config) jwt.Keyfunc {
 		return func(token *jwt.Token) (interface{}, error) {
 			return []byte(cfg.JWTSecret), nil
 		}
-	case "RS256", "RS384", "RS512":
+	case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512":
 		return func(token *jwt.Token) (interface{}, error) {
 			return jwt.ParseRSAPublicKeyFromPEM([]byte(cfg.JWTPublicKey))
 		}
@@ -216,7 +216,7 @@ func TestGenerateAccessToken_ES256MissingPrivateKey(t *testing.T) {
 }
 
 func TestGenerateAccessToken_AdditionalAlgorithms(t *testing.T) {
-	algorithms := []string{"HS384", "HS512", "RS384", "RS512", "ES384", "ES512"}
+	algorithms := []string{"HS384", "HS512", "RS384", "RS512", "PS256", "PS384", "PS512", "ES384", "ES512"}
 
 	for _, algorithm := range algorithms {
 		t.Run(algorithm, func(t *testing.T) {
@@ -675,7 +675,7 @@ func TestJWTAuth_ValidToken_ES256(t *testing.T) {
 }
 
 func TestJWTAuth_ValidToken_AdditionalAlgorithms(t *testing.T) {
-	algorithms := []string{"HS384", "HS512", "RS384", "RS512", "ES384", "ES512"}
+	algorithms := []string{"HS384", "HS512", "RS384", "RS512", "PS256", "PS384", "PS512", "ES384", "ES512"}
 
 	for _, algorithm := range algorithms {
 		t.Run(algorithm, func(t *testing.T) {

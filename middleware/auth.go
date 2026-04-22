@@ -209,6 +209,9 @@ func jwtAlgorithm(cfg *config.Config) string {
 		jwt.SigningMethodRS256.Alg(),
 		jwt.SigningMethodRS384.Alg(),
 		jwt.SigningMethodRS512.Alg(),
+		jwt.SigningMethodPS256.Alg(),
+		jwt.SigningMethodPS384.Alg(),
+		jwt.SigningMethodPS512.Alg(),
 		jwt.SigningMethodES256.Alg(),
 		jwt.SigningMethodES384.Alg(),
 		jwt.SigningMethodES512.Alg():
@@ -247,6 +250,12 @@ func tokenSigningConfig(cfg *config.Config) (jwt.SigningMethod, interface{}, err
 	case jwt.SigningMethodRS384.Alg():
 		fallthrough
 	case jwt.SigningMethodRS512.Alg():
+		fallthrough
+	case jwt.SigningMethodPS256.Alg():
+		fallthrough
+	case jwt.SigningMethodPS384.Alg():
+		fallthrough
+	case jwt.SigningMethodPS512.Alg():
 		privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(cfg.JWTPrivateKey))
 		if err != nil {
 			return nil, nil, fmt.Errorf("parse jwt private key: %w", err)
@@ -256,8 +265,14 @@ func tokenSigningConfig(cfg *config.Config) (jwt.SigningMethod, interface{}, err
 			return jwt.SigningMethodRS256, privateKey, nil
 		case jwt.SigningMethodRS384.Alg():
 			return jwt.SigningMethodRS384, privateKey, nil
-		default:
+		case jwt.SigningMethodRS512.Alg():
 			return jwt.SigningMethodRS512, privateKey, nil
+		case jwt.SigningMethodPS256.Alg():
+			return jwt.SigningMethodPS256, privateKey, nil
+		case jwt.SigningMethodPS384.Alg():
+			return jwt.SigningMethodPS384, privateKey, nil
+		default:
+			return jwt.SigningMethodPS512, privateKey, nil
 		}
 	case jwt.SigningMethodES256.Alg():
 		fallthrough
@@ -285,7 +300,13 @@ func tokenVerificationKey(cfg *config.Config, algorithm string) (interface{}, er
 	switch algorithm {
 	case jwt.SigningMethodHS256.Alg(), jwt.SigningMethodHS384.Alg(), jwt.SigningMethodHS512.Alg():
 		return []byte(cfg.JWTSecret), nil
-	case jwt.SigningMethodRS256.Alg(), jwt.SigningMethodRS384.Alg(), jwt.SigningMethodRS512.Alg():
+	case
+		jwt.SigningMethodRS256.Alg(),
+		jwt.SigningMethodRS384.Alg(),
+		jwt.SigningMethodRS512.Alg(),
+		jwt.SigningMethodPS256.Alg(),
+		jwt.SigningMethodPS384.Alg(),
+		jwt.SigningMethodPS512.Alg():
 		return jwtRSAVerificationKey(cfg)
 	case jwt.SigningMethodES256.Alg(), jwt.SigningMethodES384.Alg(), jwt.SigningMethodES512.Alg():
 		return jwtECDSAVerificationKey(cfg)

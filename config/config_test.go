@@ -367,7 +367,7 @@ func TestLoad_JWTAlgorithmES256(t *testing.T) {
 }
 
 func TestLoad_JWTAlgorithmAdditionalSupportedValues(t *testing.T) {
-	algorithms := []string{"hs384", "hs512", "rs384", "rs512", "es384", "es512"}
+	algorithms := []string{"hs384", "hs512", "rs384", "rs512", "ps256", "ps384", "ps512", "es384", "es512"}
 
 	for _, algorithm := range algorithms {
 		t.Run(strings.ToUpper(algorithm), func(t *testing.T) {

@@ -84,7 +84,7 @@ Use OpenSSL to generate private/public key pairs for asymmetric JWT algorithms.
 mkdir -p secrets
 ```
 
-#### RS256 / RS384 / RS512 (RSA, recommended 2048+ bits)
+#### RS256 / RS384 / RS512 / PS256 / PS384 / PS512 (RSA, recommended 2048+ bits)
 
 ```bash
 # Private key
@@ -112,6 +112,24 @@ JWT_PUBLIC_KEY_FILE=./secrets/jwt_rsa_public.pem
 
 ```bash
 JWT_ALGORITHM=RS512
+JWT_PRIVATE_KEY_FILE=./secrets/jwt_rsa_private.pem
+JWT_PUBLIC_KEY_FILE=./secrets/jwt_rsa_public.pem
+```
+
+```bash
+JWT_ALGORITHM=PS256
+JWT_PRIVATE_KEY_FILE=./secrets/jwt_rsa_private.pem
+JWT_PUBLIC_KEY_FILE=./secrets/jwt_rsa_public.pem
+```
+
+```bash
+JWT_ALGORITHM=PS384
+JWT_PRIVATE_KEY_FILE=./secrets/jwt_rsa_private.pem
+JWT_PUBLIC_KEY_FILE=./secrets/jwt_rsa_public.pem
+```
+
+```bash
+JWT_ALGORITHM=PS512
 JWT_PRIVATE_KEY_FILE=./secrets/jwt_rsa_private.pem
 JWT_PUBLIC_KEY_FILE=./secrets/jwt_rsa_public.pem
 ```
@@ -188,13 +206,13 @@ Configuration is loaded from environment variables.
 | `DB_PASSWORD_FILE` | - | Path to file containing database password (for Docker secrets) |
 | `DB_PASSWORD` | `userservice` | Database password |
 | `DB_NAME` | `userservice` | Database name |
-| `JWT_ALGORITHM` | `HS256` | Access token signing algorithm (`HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`) |
+| `JWT_ALGORITHM` | `HS256` | Access token signing algorithm (`HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`) |
 | `JWT_SECRET_FILE` | - | Path to file containing JWT secret (`HS256`/`HS384`/`HS512`) |
 | `JWT_SECRET` | `your-secret-key-change-in-production` | Secret key for `HS256`/`HS384`/`HS512` signing (fallback) |
-| `JWT_PRIVATE_KEY_FILE` | - | Path to private key PEM file (`RS*`/`ES*` signing) |
-| `JWT_PRIVATE_KEY` | - | Private key PEM (`RS*`/`ES*` signing) |
-| `JWT_PUBLIC_KEY_FILE` | - | Path to public key PEM file (`RS*`/`ES*` verification) |
-| `JWT_PUBLIC_KEY` | - | Public key PEM (`RS*`/`ES*` verification; optional when private key is provided) |
+| `JWT_PRIVATE_KEY_FILE` | - | Path to private key PEM file (`RS*`/`PS*`/`ES*` signing) |
+| `JWT_PRIVATE_KEY` | - | Private key PEM (`RS*`/`PS*`/`ES*` signing) |
+| `JWT_PUBLIC_KEY_FILE` | - | Path to public key PEM file (`RS*`/`PS*`/`ES*` verification) |
+| `JWT_PUBLIC_KEY` | - | Public key PEM (`RS*`/`PS*`/`ES*` verification; optional when private key is provided) |
 | `JWT_ISSUER` | - | Optional JWT issuer claim (`iss`) for access tokens. When set, incoming access tokens must match this issuer. |
 | `JWT_AUDIENCE` | - | Optional JWT audience claim (`aud`) for access tokens. When set, incoming access tokens must include this audience. |
 | `JWT_EXPIRE` | `15m` | Access token lifetime (Go duration, e.g. `5m`, `30m`, `1h`) |
@@ -247,7 +265,7 @@ The header defines how the token is signed:
 }
 ```
 
-- `alg`: Signing algorithm from `JWT_ALGORITHM` (`HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`)
+- `alg`: Signing algorithm from `JWT_ALGORITHM` (`HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`)
 - `typ`: Token type (`JWT`)
 
 **2) Payload (claims)**
@@ -280,6 +298,7 @@ The signature protects integrity:
 
 - For `HS256` / `HS384` / `HS512`: `HMACSHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_SECRET)`
 - For `RS256` / `RS384` / `RS512`: `RSASSA-PKCS1-v1_5-SHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
+- For `PS256` / `PS384` / `PS512`: `RSASSA-PSS-SHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
 - For `ES256` / `ES384` / `ES512`: `ECDSA-P(256|384|521)-SHA(256|384|512)(base64url(header) + "." + base64url(payload), JWT_PRIVATE_KEY)`
 
 If header or payload is modified, signature validation fails and the API returns `401`.
@@ -562,7 +581,7 @@ func main() {
 
 ## Security Considerations
 
-- Prefer asymmetric JWT algorithms (`RS256`/`RS384`/`RS512` or `ES256`/`ES384`/`ES512`) in production
+- Prefer asymmetric JWT algorithms (`RS256`/`RS384`/`RS512`, `PS256`/`PS384`/`PS512`, or `ES256`/`ES384`/`ES512`) in production
 - Protect `JWT_PRIVATE_KEY` / `JWT_PRIVATE_KEY_FILE` as a secret
 - Rotate JWT keys regularly
 - If you use `HS256`/`HS384`/`HS512`, set `JWT_SECRET` to a secure random value

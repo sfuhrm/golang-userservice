@@ -20,10 +20,10 @@ type Config struct {
 	DBUser                   string        // Database username (default: userservice)
 	DBPassword               string        // Database password (default: userservice)
 	DBName                   string        // Database name (default: userservice)
-	JWTAlgorithm             string        // JWT signing algorithm: HS*, RS*, or ES* variants (256/384/512)
+	JWTAlgorithm             string        // JWT signing algorithm: HS*, RS*, PS*, or ES* variants (256/384/512)
 	JWTSecret                string        // Secret key for HS* JWT tokens
-	JWTPrivateKey            string        // Private key PEM for RS*/ES* token signing
-	JWTPublicKey             string        // Public key PEM for RS*/ES* token verification
+	JWTPrivateKey            string        // Private key PEM for RS*/PS*/ES* token signing
+	JWTPublicKey             string        // Public key PEM for RS*/PS*/ES* token verification
 	JWTIssuer                string        // Optional JWT issuer claim (iss)
 	JWTAudience              string        // Optional JWT audience claim (aud)
 	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
@@ -213,7 +213,7 @@ func isHMACJWTAlgorithm(algorithm string) bool {
 
 func isRSAJWTAlgorithm(algorithm string) bool {
 	switch algorithm {
-	case "RS256", "RS384", "RS512":
+	case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512":
 		return true
 	default:
 		return false
@@ -231,7 +231,7 @@ func isECDSAJWTAlgorithm(algorithm string) bool {
 
 func invalidJWTAlgorithmError(rawAlgorithm string) error {
 	return fmt.Errorf(
-		"invalid JWT_ALGORITHM %q: must be HS256, HS384, HS512, RS256, RS384, RS512, ES256, ES384, or ES512",
+		"invalid JWT_ALGORITHM %q: must be HS256, HS384, HS512, RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384, or ES512",
 		rawAlgorithm,
 	)
 }

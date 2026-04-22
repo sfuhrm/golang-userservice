@@ -27,6 +27,12 @@ jobs:
             algorithm: RS384
           - id: rs512
             algorithm: RS512
+          - id: ps256
+            algorithm: PS256
+          - id: ps384
+            algorithm: PS384
+          - id: ps512
+            algorithm: PS512
           - id: es256
             algorithm: ES256
           - id: es384
@@ -60,7 +66,7 @@ jobs:
             HS256|HS384|HS512)
               openssl rand -hex 64 > secrets/jwt_secret.txt
               ;;
-            RS256|RS384|RS512)
+            RS256|RS384|RS512|PS256|PS384|PS512)
               openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out secrets/jwt_private.pem
               openssl pkey -in secrets/jwt_private.pem -pubout -out secrets/jwt_public.pem
               ;;
@@ -98,7 +104,7 @@ jobs:
                 JWT_SECRET_FILE: /run/secrets/jwt_secret.txt
           YAML
               ;;
-            RS256|RS384|RS512)
+            RS256|RS384|RS512|PS256|PS384|PS512)
               cat > docker-compose.e2e.override.yml <<YAML
           services:
             app:

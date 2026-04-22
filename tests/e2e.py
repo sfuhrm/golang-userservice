@@ -129,7 +129,7 @@ def decode_and_verify_jwt_claims(token):
 
     if header_alg.startswith("HS"):
         verification_key = resolve_hmac_secret()
-    elif header_alg.startswith("RS") or header_alg.startswith("ES"):
+    elif header_alg.startswith("RS") or header_alg.startswith("PS") or header_alg.startswith("ES"):
         verification_key = resolve_public_key()
     else:
         fail(f"Unsupported JWT algorithm for verification: {header_alg}")
