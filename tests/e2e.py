@@ -4,8 +4,11 @@ import time
 import os
 import subprocess
 import uuid
-import base64
-import json
+try:
+    import jwt
+except ImportError:
+    print("FAILED: PyJWT is required for JWT signature verification. Install with: pip install \"PyJWT[crypto]\"")
+    sys.exit(1)
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8080/v1")
 _next_test_ip_octet = 1
@@ -70,23 +73,94 @@ def with_test_ip(headers=None):
     return merged
 
 
-def decode_jwt_claims(token):
-    parts = token.split(".")
-    if len(parts) != 3:
-        fail("Access token is not a valid JWT format")
-
-    payload = parts[1]
-    padding = "=" * (-len(payload) % 4)
+def read_secret_from_file(path, context):
     try:
-        decoded = base64.urlsafe_b64decode(payload + padding)
-        claims = json.loads(decoded.decode("utf-8"))
-    except Exception as exc:
-        fail(f"Failed to decode JWT payload: {exc}")
-    return claims
+        with open(path, "r", encoding="utf-8") as file:
+            return file.read().strip()
+    except OSError as exc:
+        fail(f"Failed to read {context} from {path}: {exc}")
+
+
+def resolve_hmac_secret():
+    secret_file = os.getenv("JWT_SECRET_FILE")
+    if secret_file:
+        return read_secret_from_file(secret_file, "JWT secret")
+
+    secret = os.getenv("JWT_SECRET")
+    if secret:
+        return secret
+
+    local_secret_path = "secrets/jwt_secret.txt"
+    if os.path.exists(local_secret_path):
+        return read_secret_from_file(local_secret_path, "JWT secret")
+
+    fail("Missing HMAC JWT secret. Set JWT_SECRET/JWT_SECRET_FILE or provide secrets/jwt_secret.txt")
+
+
+def resolve_public_key():
+    public_key_file = os.getenv("JWT_PUBLIC_KEY_FILE")
+    if public_key_file:
+        return read_secret_from_file(public_key_file, "JWT public key")
+
+    public_key = os.getenv("JWT_PUBLIC_KEY")
+    if public_key:
+        return public_key
+
+    local_public_key_path = "secrets/jwt_public.pem"
+    if os.path.exists(local_public_key_path):
+        return read_secret_from_file(local_public_key_path, "JWT public key")
+
+    fail("Missing JWT public key. Set JWT_PUBLIC_KEY/JWT_PUBLIC_KEY_FILE or provide secrets/jwt_public.pem")
+
+
+def decode_and_verify_jwt_claims(token):
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.PyJWTError as exc:
+        fail(f"Access token has invalid JWT header: {exc}")
+
+    header_alg = str(header.get("alg", "")).upper()
+    if not header_alg:
+        fail("Access token JWT header is missing alg")
+
+    expected_alg = os.getenv("JWT_ALGORITHM", "").strip().upper()
+    if expected_alg and header_alg != expected_alg:
+        fail(f"JWT alg mismatch: header alg={header_alg}, expected={expected_alg}")
+
+    if header_alg.startswith("HS"):
+        verification_key = resolve_hmac_secret()
+    elif header_alg.startswith("RS") or header_alg.startswith("ES"):
+        verification_key = resolve_public_key()
+    else:
+        fail(f"Unsupported JWT algorithm for verification: {header_alg}")
+
+    expected_issuer = os.getenv("JWT_ISSUER", "").strip()
+    expected_audience = os.getenv("JWT_AUDIENCE", "").strip()
+    options = {
+        "require": ["sub", "jti", "iat", "exp"],
+        "verify_aud": bool(expected_audience),
+    }
+
+    decode_kwargs = {
+        "jwt": token,
+        "key": verification_key,
+        "algorithms": [header_alg],
+        "options": options,
+    }
+
+    if expected_issuer:
+        decode_kwargs["issuer"] = expected_issuer
+    if expected_audience:
+        decode_kwargs["audience"] = expected_audience
+
+    try:
+        return jwt.decode(**decode_kwargs)
+    except jwt.PyJWTError as exc:
+        fail(f"JWT signature/claim verification failed: {exc}")
 
 
 def assert_jwt_claims(access_token, expected_sub, required_roles):
-    claims = decode_jwt_claims(access_token)
+    claims = decode_and_verify_jwt_claims(access_token)
 
     if claims.get("sub") != expected_sub:
         fail(f"JWT sub mismatch: {claims.get('sub')} != {expected_sub}")

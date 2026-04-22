@@ -85,7 +85,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python dependencies
-        run: pip install requests
+        run: pip install requests "PyJWT[crypto]"
 
       - name: Create JWT RSA key pair
         run: |
