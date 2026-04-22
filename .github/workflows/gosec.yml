@@ -29,12 +29,49 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
-      - name: Run gosec
+      - name: Run gosec and capture results
+        id: gosec_scan
+        continue-on-error: true
         run: |
-          set -euo pipefail
-          "$(go env GOPATH)/bin/gosec" -fmt sarif -out gosec.sarif ./...
+          set -o pipefail
+          set +e
+
+          GOSEC_BIN="$(go env GOPATH)/bin/gosec"
+
+          "$GOSEC_BIN" -fmt sarif -out gosec.sarif ./... 2>&1 | tee gosec.log
+          GOSEC_EXIT="${PIPESTATUS[0]}"
+
+          echo "exit_code=$GOSEC_EXIT" >> "$GITHUB_OUTPUT"
+          echo "Gosec exit code: $GOSEC_EXIT"
+
+          {
+            echo "### Gosec Scan"
+            echo ""
+            echo "- Exit code: \`$GOSEC_EXIT\`"
+            echo "- SARIF present: \`$(test -f gosec.sarif && echo yes || echo no)\`"
+            echo "- Log present: \`$(test -f gosec.log && echo yes || echo no)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload gosec artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gosec-report
+          path: |
+            gosec.sarif
+            gosec.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload SARIF report
+        if: always() && hashFiles('gosec.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gosec.sarif
+
+      - name: Fail workflow if gosec found issues
+        if: always() && steps.gosec_scan.outputs.exit_code != '0'
+        run: |
+          echo "::error::gosec failed. Download the 'gosec-report' artifact for logs and SARIF details."
+          exit 1
