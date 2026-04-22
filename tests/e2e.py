@@ -8,6 +8,19 @@ import base64
 import json
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8080/v1")
+_next_test_ip_octet = 1
+
+
+def next_test_ip():
+    global _next_test_ip_octet
+    octet = _next_test_ip_octet
+    _next_test_ip_octet += 1
+
+    # Keep generated test IPs within 198.51.100.1-250.
+    if _next_test_ip_octet > 250:
+        _next_test_ip_octet = 1
+
+    return f"198.51.100.{octet}"
 
 
 def wait_for_service(url, max_retries=30, delay=2):
@@ -53,7 +66,7 @@ def expect_retry_after_header(response, context):
 def with_test_ip(headers=None):
     merged = dict(headers or {})
     if "X-Forwarded-For" not in merged:
-        merged["X-Forwarded-For"] = f"198.51.100.{(uuid.uuid4().int % 250) + 1}"
+        merged["X-Forwarded-For"] = next_test_ip()
     return merged
 
 
@@ -450,7 +463,7 @@ def test_e2e():
     print("Verified verify registration succeeds with valid token")
 
     print("Testing auth rate limit includes Retry-After header...")
-    rate_limited_ip_headers = {"X-Forwarded-For": "198.51.100.250"}
+    rate_limited_ip_headers = {"X-Forwarded-For": next_test_ip()}
     for attempt in range(6):
         response = requests.post(
             f"{BASE_URL}/auth/login",
