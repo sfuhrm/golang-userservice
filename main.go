@@ -3,8 +3,10 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
@@ -38,6 +40,8 @@ func main() {
 	if err := database.Migrate(db, "migrations"); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
+
+	startRefreshTokenCleanupTask(db, cfg.RefreshCleanupInterval)
 
 	e := echo.New()
 
@@ -107,4 +111,40 @@ func main() {
 	if err := e.Start(":" + cfg.ServerPort); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// startRefreshTokenCleanupTask runs a background task that periodically removes expired refresh tokens.
+func startRefreshTokenCleanupTask(db *sql.DB, interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Hour
+	}
+
+	cleanup := func() {
+		result, err := db.Exec("DELETE FROM refresh_tokens WHERE expires_at <= ?", time.Now())
+		if err != nil {
+			log.Printf("Refresh token cleanup failed: %v", err)
+			return
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			log.Printf("Refresh token cleanup could not determine deleted rows: %v", err)
+			return
+		}
+
+		if rowsAffected > 0 {
+			log.Printf("Refresh token cleanup removed %d expired token(s)", rowsAffected)
+		}
+	}
+
+	cleanup()
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			cleanup()
+		}
+	}()
 }

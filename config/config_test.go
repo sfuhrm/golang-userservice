@@ -26,6 +26,7 @@ func TestLoad_DefaultValues(t *testing.T) {
 	os.Unsetenv("JWT_AUDIENCE")
 	os.Unsetenv("JWT_EXPIRE")
 	os.Unsetenv("REFRESH_EXPIRE")
+	os.Unsetenv("REFRESH_CLEANUP_INTERVAL")
 	os.Unsetenv("RATE_LIMIT")
 	os.Unsetenv("RATE_LIMIT_WINDOW")
 	os.Unsetenv("AUTH_RATE_LIMIT")
@@ -84,6 +85,9 @@ func TestLoad_DefaultValues(t *testing.T) {
 	if cfg.RefreshExpire != 7*24*time.Hour {
 		t.Errorf("RefreshExpire = %v, want 7d", cfg.RefreshExpire)
 	}
+	if cfg.RefreshCleanupInterval != time.Hour {
+		t.Errorf("RefreshCleanupInterval = %v, want 1h", cfg.RefreshCleanupInterval)
+	}
 	if cfg.RateLimit != 100 {
 		t.Errorf("RateLimit = %d, want 100", cfg.RateLimit)
 	}
@@ -117,6 +121,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	os.Setenv("JWT_AUDIENCE", "userservice-api")
 	os.Setenv("JWT_EXPIRE", "20m")
 	os.Setenv("REFRESH_EXPIRE", "240h")
+	os.Setenv("REFRESH_CLEANUP_INTERVAL", "90m")
 	os.Setenv("RATE_LIMIT", "250")
 	os.Setenv("RATE_LIMIT_WINDOW", "30m")
 	os.Setenv("AUTH_RATE_LIMIT", "25")
@@ -142,6 +147,7 @@ func TestLoad_FromEnvironment(t *testing.T) {
 		os.Unsetenv("JWT_AUDIENCE")
 		os.Unsetenv("JWT_EXPIRE")
 		os.Unsetenv("REFRESH_EXPIRE")
+		os.Unsetenv("REFRESH_CLEANUP_INTERVAL")
 		os.Unsetenv("RATE_LIMIT")
 		os.Unsetenv("RATE_LIMIT_WINDOW")
 		os.Unsetenv("AUTH_RATE_LIMIT")
@@ -199,6 +205,9 @@ func TestLoad_FromEnvironment(t *testing.T) {
 	}
 	if cfg.RefreshExpire != 240*time.Hour {
 		t.Errorf("RefreshExpire = %v, want 240h", cfg.RefreshExpire)
+	}
+	if cfg.RefreshCleanupInterval != 90*time.Minute {
+		t.Errorf("RefreshCleanupInterval = %v, want 90m", cfg.RefreshCleanupInterval)
 	}
 	if cfg.RateLimit != 250 {
 		t.Errorf("RateLimit = %d, want 250", cfg.RateLimit)
@@ -407,6 +416,7 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	os.Setenv("RATE_LIMIT_WINDOW", "not-a-duration")
 	os.Setenv("JWT_EXPIRE", "not-a-duration")
 	os.Setenv("REFRESH_EXPIRE", "-3h")
+	os.Setenv("REFRESH_CLEANUP_INTERVAL", "invalid")
 	os.Setenv("ENABLE_DEBUG_COVERAGE", "not-a-bool")
 	defer os.Unsetenv("RATE_LIMIT")
 	defer os.Unsetenv("AUTH_RATE_LIMIT")
@@ -414,6 +424,7 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	defer os.Unsetenv("RATE_LIMIT_WINDOW")
 	defer os.Unsetenv("JWT_EXPIRE")
 	defer os.Unsetenv("REFRESH_EXPIRE")
+	defer os.Unsetenv("REFRESH_CLEANUP_INTERVAL")
 	defer os.Unsetenv("ENABLE_DEBUG_COVERAGE")
 
 	os.Setenv("JWT_ALGORITHM", "HS256")
@@ -443,6 +454,9 @@ func TestLoad_InvalidRateLimitSettingsFallbackToDefaults(t *testing.T) {
 	}
 	if cfg.RefreshExpire != 7*24*time.Hour {
 		t.Errorf("RefreshExpire = %v, want default 7d", cfg.RefreshExpire)
+	}
+	if cfg.RefreshCleanupInterval != time.Hour {
+		t.Errorf("RefreshCleanupInterval = %v, want default 1h", cfg.RefreshCleanupInterval)
 	}
 	if cfg.EnableDebugCoverage {
 		t.Errorf("EnableDebugCoverage = %v, want default false", cfg.EnableDebugCoverage)

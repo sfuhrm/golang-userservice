@@ -28,6 +28,7 @@ type Config struct {
 	JWTAudience              string        // Optional JWT audience claim (aud)
 	JWTExpire                time.Duration // Access token expiration time (default: 15 minutes)
 	RefreshExpire            time.Duration // Refresh token expiration time (default: 7 days)
+	RefreshCleanupInterval   time.Duration // Interval for removing expired refresh tokens (default: 1 hour)
 	RateLimit                int           // Standard rate limit requests per window (default: 100)
 	RateLimitWindow          time.Duration // Rate limit time window (default: 15 minutes)
 	AuthRateLimit            int           // Auth endpoints rate limit (default: 5)
@@ -86,6 +87,7 @@ func Load() (*Config, error) {
 		JWTAudience:              getEnv("JWT_AUDIENCE", ""),
 		JWTExpire:                getEnvDuration("JWT_EXPIRE", 15*time.Minute),
 		RefreshExpire:            getEnvDuration("REFRESH_EXPIRE", 7*24*time.Hour),
+		RefreshCleanupInterval:   getEnvDuration("REFRESH_CLEANUP_INTERVAL", time.Hour),
 		RateLimit:                getEnvInt("RATE_LIMIT", 100),
 		RateLimitWindow:          getEnvDuration("RATE_LIMIT_WINDOW", 15*time.Minute),
 		AuthRateLimit:            getEnvInt("AUTH_RATE_LIMIT", 5),

@@ -20,6 +20,7 @@ services:
       # - AUTH_RATE_LIMIT=5
       # - REFRESH_RATE_LIMIT=30
       # - RATE_LIMIT_WINDOW=15m
+      # - REFRESH_CLEANUP_INTERVAL=1h
       # - REGISTRATION_MAIL_URL=http://mail-service/register
       # - REGISTRATION_MAIL_CALLBACK_URL=http://localhost:8080/v1/auth/verify-registration
       # - RECOVERY_MAIL_URL=http://mail-service/recover

@@ -217,6 +217,7 @@ Configuration is loaded from environment variables.
 | `JWT_AUDIENCE` | - | Optional JWT audience claim (`aud`) for access tokens. When set, incoming access tokens must include this audience. |
 | `JWT_EXPIRE` | `15m` | Access token lifetime (Go duration, e.g. `5m`, `30m`, `1h`) |
 | `REFRESH_EXPIRE` | `168h` | Refresh token lifetime (Go duration, e.g. `24h`, `168h`) |
+| `REFRESH_CLEANUP_INTERVAL` | `1h` | How often expired refresh tokens are removed in a background cleanup task (Go duration, e.g. `15m`, `1h`) |
 | `RATE_LIMIT` | `100` | Standard rate limit requests per window (per IP) |
 | `AUTH_RATE_LIMIT` | `5` | Auth endpoint rate limit requests per window (per IP) |
 | `REFRESH_RATE_LIMIT` | `30` | Refresh endpoint rate limit requests per window (per IP) |
@@ -242,6 +243,7 @@ Token expiry and rate limits are configurable via environment variables.
 |---------|-------|-------------|
 | JWT Expiry (default) | 15 minutes | Access token lifetime (`JWT_EXPIRE`) |
 | Refresh Token Expiry (default) | 7 days | Refresh token lifetime (`REFRESH_EXPIRE`) |
+| Refresh Cleanup Interval (default) | 1 hour | Background cleanup frequency for expired refresh tokens (`REFRESH_CLEANUP_INTERVAL`) |
 | Standard Rate Limit (default) | 100 requests / 15 min | Per IP address |
 | Auth Rate Limit (default) | 5 requests / 15 min | Per IP address (login, password-recovery) |
 | Refresh Rate Limit (default) | 30 requests / 15 min | Per IP address (`/v1/auth/refresh`) |
