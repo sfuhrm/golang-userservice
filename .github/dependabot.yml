@@ -24,6 +24,8 @@ updates:
     labels:
       - "github-actions"
       - "security"
+      
+  # 3. Updates für Docker
   - package-ecosystem: "docker"
     directory: "/" # Sucht im Root nach Dockerfiles
     schedule:
